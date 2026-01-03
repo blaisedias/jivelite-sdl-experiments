@@ -1,0 +1,295 @@
+{
+    "screen" : {
+        "comment" : "values are scaled to match",
+        "x": 0,
+        "y": 0,
+        "w": 800,
+        "h": 480
+    },
+    "widgets": [
+        {
+            "image": {
+                "location": {
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "w": 0,
+                        "h": 0
+                    }
+                },
+                "image": "./images/wallpapers/HD_MilkyWay.png",
+                "image_scaling": "fit",
+                "focus_enable": false
+            }
+        },
+        {
+            "vumeter": {
+                "location": {
+                    "position": {
+                        "y": 50,
+                        "h": -50
+                    }
+                },
+                "select" : "PurpleTastic2Transparent"
+            }
+        },
+        {
+            "multistate_button": {
+                "location": {
+                    "container": {
+                        "x": 0,
+                        "y": 50,
+                        "w": 0,
+                        "h": -50
+                    },
+                    "position": {
+                        "x": "center",
+                        "y": "top",
+                        "w": 100,
+                        "h": 50
+                    }
+                },
+                "hotspot": true,
+                "hotspot_edge": "top",
+                "state": 0,
+                "states": [
+                    {
+                        "image": "./images/hotspot-pin-offon.png",
+                        "action": "lock_visu"
+                    },
+                    {
+                        "image": "./images/hotspot-pin-onoff.png",
+                        "action": "unlock_visu"
+                    }
+                ]
+            }
+        },
+        {
+            "button": {
+                "location": {
+                    "container": {
+                        "x": 0,
+                        "y": 50,
+                        "w": 0,
+                        "h": -50
+                    },
+                    "position" : {
+                        "x": "right",
+                        "y": "center",
+                        "w": 32,
+                        "h": 32
+                    }
+                },
+                "hotspot": true,
+                "hotspot_edge": "right",
+                "image": "./images/hotspot-arrow_forward.png",
+                "action": "next_visu"
+            }
+        },
+        {
+            "button": {
+                "location": {
+                    "container": {
+                        "x": 0,
+                        "y": 50,
+                        "w": 0,
+                        "h": -50
+                    },
+                    "position": {
+                        "x": "left",
+                        "y": "center",
+                        "w": 32,
+                        "h": 32
+                    }
+                },
+                "hotspot": true,
+                "hotspot_edge": "left",
+                "image": "./images/hotspot-arrow_back.png",
+                "action": "prev_visu"
+            }
+        },
+
+
+        {
+            "button": {
+                "location": {
+                    "position": {
+                        "x": 20,
+                        "y": -60,
+                        "w": 50,
+                        "h": 50
+                    }
+                },
+                "image": "./images/skip-previous.png",
+                "action": "previous-track"
+            }
+        },
+        {
+            "multistate_button": {
+                "location": {
+                    "position": {
+                        "x": 90,
+                        "y": -60,
+                        "w": 50,
+                        "h": 50
+                    }
+                },
+                "states": [
+                    {
+                        "image": "./images/play-circle.png",
+                        "action": "pause"
+                    },
+                    {
+                        "image": "./images/pause-circle.png",
+                        "action": "play"
+                    }
+                ]
+            }
+        },
+        {
+            "button": {
+                "location": {
+                    "position": {
+                        "x": 160,
+                        "y": -60,
+                        "w": 50,
+                        "h": 50
+                    }
+                },
+                "image": "./images/skip-next.png",
+                "action": "next-track"
+            }
+        },
+        {
+            "button": {
+                "location": {
+                    "position": {
+                        "x": 230,
+                        "y": -60,
+                        "w": 50,
+                        "h": 50
+                    }
+                },
+                "image": "./images/stop-circle.png",
+                "action": "stop"
+            }
+        },
+        {
+            "multistate_button": {
+                "location": {
+                    "position": {
+                        "x": 300,
+                        "y": -60,
+                        "w": 100,
+                        "h": 50
+                    }
+                },
+                "states": [
+                    {
+                        "image": "./images/repeat-off-to-once.png",
+                        "action": "repeat-once"
+                    },
+                    {
+                        "image": "./images/repeat-once-to-repeat.png",
+                        "action": "repeat"
+                    },
+                    {
+                        "image": "./images/repeat-to-repeat-off.png",
+                        "action": "repeat-off"
+                    }
+                ]
+            }
+        },
+        {
+            "multistate_button": {
+                "location": {
+                    "position": {
+                        "x": 420,
+                        "y": -60,
+                        "w": 100,
+                        "h": 50
+                    }
+                },
+                "states": [
+                    {
+                        "image": "./images/shuffle-off-to-on.png",
+                        "action": "shuffle"
+                    },
+                    {
+                        "image": "./images/shuffle-on-to-album.png",
+                        "action": "shuffle-album"
+                    },
+                    {
+                        "image": "./images/shuffle-album-to-off.png",
+                        "action": "shuffle-off"
+                    }
+                ]
+            }
+        },
+        {
+            "button": {
+                "location": {
+                    "position": {
+                        "x": 540,
+                        "y": -60,
+                        "w": 50,
+                        "h": 50
+                    }
+                },
+                "image": "./images/music-information.png",
+                "action": "music-information"
+            }
+        },
+        {
+            "slider": {
+                "location": {
+                    "position": {
+                        "x": 50,
+                        "y": -90,
+                        "w": -50,
+                        "h": 50
+                    }
+                },
+                "interactive": true,
+                "bar": {
+                    "image": [
+                        "./images/slider-bar.png",
+                        "./images/slider-bar-empty.png"
+                    ]
+                },
+                "pick": {
+                    "image": "./images/slider-pick-circle.png",
+                    "width": 16,
+                    "height": 16
+                },
+                "bar_start": {
+                    "image": "./images/slider-bar-left-end.png",
+                    "width": 2
+                },
+                "bar_end": {
+                    "image": "./images/slider-bar-right-end-empty.png",
+                    "width": 2
+                },
+                "range": {
+                    "start": 0,
+                    "end": 100
+                },
+                "action": "set-volume-level"
+            }
+        },
+        {
+            "button": {
+                "location": {
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "w": 32,
+                        "h": 32
+                    }
+                },
+                "image": "./images/close.png",
+                "action": "quit"
+            }
+        }
+    ]
+}
