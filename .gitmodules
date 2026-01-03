@@ -1,0 +1,9 @@
+[submodule "cityhash-c"]
+	path = cityhash-c
+	url = https://github.com/blaisedias/cityhash-c.git
+[submodule "json-parser"]
+	path = json-parser
+	url = https://github.com/json-parser/json-parser.git
+[submodule "tcz-libts"]
+	path = tcz-libts
+	url = https://github.com/ralph-irving/tcz-libts
