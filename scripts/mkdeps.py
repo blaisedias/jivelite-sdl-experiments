@@ -90,7 +90,7 @@ def gen_deps(output, regex, deps, objdir='', globaldeps=''):
     for path in sorted(deps.keys()):
         incs = deps[path]
         if len(incs) and regex.search(path):
-            obj = f'{objdir}{path.split('/')[-1].split('.')[0]}.o'
+            obj = f"{objdir}{path.split('/')[-1].split('.')[0]}.o"
             pdeps = list(incs)
             for inc in incs:
                 pdeps.extend(deps[inc])
