@@ -14,3 +14,4 @@ tce-load -il libEGL-dev
 #tce-load -il libGLES
 tce-load -il cmake
 tce-load -il compiletc
+tce-load -il python3.11
