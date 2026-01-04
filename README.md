@@ -4,6 +4,7 @@ Repo for POC using SDL2/SDL3
 Currently only SDL2
 
 ## Requirements
+* git
 * make
 * python3
 * gcc
@@ -13,6 +14,13 @@ Currently only SDL2
 
 optional:
 * tslib
+
+## Git
+```
+git clone https://github.com/blaisedias/jivelite-sdl-experiments.git
+cd jivelite-sdl-experiments/
+git submodule update --init --recursive
+```
 
 ## Build
 ```
