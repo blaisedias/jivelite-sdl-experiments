@@ -51,4 +51,4 @@ if [ -f "/usr/local/etc/pcp/pcpversion.cfg" ]; then
     pcp_setup
 fi
 
-./bin/sqvumeter dl ./lib/TubeD.so  dl ./lib/Chevrons.so dl ./lib/PurpleTastic.so bg ./images/wallpapers/wallhaven1.jpg vsync vu PurpleTastic2Transparent $*
+./bin/sqvumeter dl ./lib/TubeD.so  dl ./lib/Chevrons.so dl ./lib/PurpleTastic.so vsync vu PurpleTastic2Transparent $*
