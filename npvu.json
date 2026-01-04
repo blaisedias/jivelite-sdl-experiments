@@ -18,7 +18,8 @@
                     }
                 },
                 "image": "./images/wallpapers/HD_MilkyWay.png",
-                "image_scaling": "fit",
+                "#comment": "image_scaling is one of [fit, center, stretch]",
+                "image_scaling": "center",
                 "focus_enable": false
             }
         },

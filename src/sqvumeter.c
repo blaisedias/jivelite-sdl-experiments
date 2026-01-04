@@ -37,7 +37,6 @@ const char* help_text=""
 "\n"  
 " - list list the set of VU Meters and exit\n"
 " - dl <path-to-object-file> : dynamically load VU meter in object file\n"
-" - bg <filename> : set background image file\n"
 "\n"  
 " - wxh <width> <height> : window width and height, only works if window manager is avialable\n"
 " - fullscreen\n"
@@ -50,7 +49,6 @@ const char* help_text=""
 " - showinputrects  : show widget input rectangles when pointer is over them"
 "\n";  
 
-const char* bg_image_path="./images/wallpapers/wallhaven1.jpg";
 const char* json_file="./npvu.json";
 
 struct App {
@@ -159,11 +157,6 @@ int main(int argc, char **argv) {
         } else if (0 == strcmp(argv[i], "dl")) {
             if (argc > i+1) {
                 VUMeter_loadlib(argv[i+1]);
-                i += 1;
-            }
-        } else if (0 == strcmp(argv[i], "bg")) {
-            if (argc > i+1) {
-                bg_image_path = argv[i+1];
                 i += 1;
             }
         } else if (0 == strcmp(argv[i], "json")) {
