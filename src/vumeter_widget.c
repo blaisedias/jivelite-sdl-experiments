@@ -75,16 +75,19 @@ void vumeter_widget_load_media(widget *wdgt, const char* resource_path) {
         vumeter_properties* props = VUMeter_scale(base_props,
                 wdgt->rect.w, wdgt->rect.h,
                 wdgt->view->app->orientation, buffer);
+#ifdef  VUMETERS_CHECK_ON_INIT
         if (!VUMeter_load_media(wdgt->view->app->renderer, props)) {
             error_printf("failed to load media for %s\n", props->name);
             continue;
         }
+#endif
         SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
         VUMeter_orientate(props, wdgt->view->app->orientation, &draw_rect);
+#ifdef  VUMETERS_CHECK_ON_INIT
         VUMeter_unload_media(props);
-
+#endif
         const vumeter* meter = props->vumeters;
         float decay_unit = (float)props->volume_levels/60;
         for(int ix = 0; ix < props->vumeter_count; ++ix, ++(vw->num_meters), ++meter) {
@@ -99,7 +102,9 @@ void vumeter_widget_load_media(widget *wdgt, const char* resource_path) {
         }
         base_props = base_props->next;
     }
-    VUMeter_load_media(wdgt->view->app->renderer, vw->meters[vw->meter_indx].props);
+    if (!VUMeter_load_media(wdgt->view->app->renderer, vw->meters[vw->meter_indx].props)) {
+        error_printf("failed to load media for %s\n",  vw->meters[vw->meter_indx].props->name);
+    }
 }
 
 extern void _show_draw_rect(widget* wdgt);
