@@ -5,6 +5,7 @@
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_syswm.h>
 #include <SDL2/SDL_render.h>
+#include <SDL2/SDL_blendmode.h>
 
 #include "widgets.h"
 #include "touch_screen_sdl2.h"
@@ -200,25 +201,38 @@ void sdl_eventloop(view_context* view) {
 }
 
 #if 1
-static int calibrate_delay(SDL_Renderer* renderer) {
-#define CALIBRATE_SAMPLE_COUNT 120
-    Uint64 pc[CALIBRATE_SAMPLE_COUNT + 1];
-//    SDL_RenderClear(renderer);
-    for (int i = 0; i < sizeof(pc)/sizeof(*pc); ++i) {
-        SDL_RenderPresent(renderer);
-        pc[i] = SDL_GetPerformanceCounter();
+#define CALIBRATION_FRAME_COUNT  360
+static int calibrate_delay(app_context* app_context) {
+    SDL_Texture* texture=IMG_LoadTexture(app_context->renderer,"./images/512-color-spiral-1542940319F0y.png");
+    SDL_Rect src_rect = {0,0,0,0};
+    SDL_QueryTexture(texture, NULL, NULL, &src_rect.w, &src_rect.h);
+    float scaleh = (float)app_context->screen_width/src_rect.w;
+    float scalev = (float)app_context->screen_height/src_rect.h;
+    float scale = scaleh > scalev ? scaleh : scalev;
+    SDL_Rect dst_rect = {0,0,src_rect.w*scale,src_rect.h*scale};
+    dst_rect.x = (app_context->screen_width - dst_rect.w)/2;
+    dst_rect.y = (app_context->screen_height - dst_rect.h)/2;
+
+    float rotation = 0.0;    
+    SDL_RenderClear(app_context->renderer);
+    SDL_RenderPresent(app_context->renderer);
+    uint64_t micros = getMicros();
+    for (int i = 0; i < CALIBRATION_FRAME_COUNT; ++i) {
+        SDL_RenderClear(app_context->renderer);
+        SDL_RenderCopyEx(app_context->renderer, texture, &src_rect,
+            &dst_rect, rotation, NULL, SDL_FLIP_NONE);
+        SDL_RenderPresent(app_context->renderer);
+        rotation += 1;
     }
-    float pfsum = 0.0;
-    for (int i = sizeof(pc)/sizeof(*pc)-1; i> 0; --i) {
-        pc[i] -= pc[i-1];
-        pfsum += pc[i];
-    }
-    printf("Calibration for vsync: fps=%5.2f, sum=%f avg=%f t=%f ms\n",
-            SDL_GetPerformanceFrequency()/(pfsum/CALIBRATE_SAMPLE_COUNT),
-            pfsum, pfsum/CALIBRATE_SAMPLE_COUNT,
-            ((pfsum/CALIBRATE_SAMPLE_COUNT)/SDL_GetPerformanceFrequency())*1000);
-    return (int)(1000*(pfsum/CALIBRATE_SAMPLE_COUNT)/SDL_GetPerformanceFrequency());
-#undef CALIBRATE_SAMPLE_COUNT
+    // milliseconds for 1000 frames
+    micros = getMicros() - micros;
+    // avg milliseconds per frame
+    micros /= CALIBRATION_FRAME_COUNT;
+    printf("Calibration for vsync: milliSeconds/frame=%f fps=%f\n",
+            (float)micros/1000, (float)1000000/micros);
+    SDL_DestroyTexture(texture);
+    return micros/1000;
+#undef CALIBRATE_FRAME_COUNT
 }
 
 #else
@@ -412,7 +426,8 @@ bool app_initialize(app_context* app_context, const char* window_title) {
         case SDL_PIXELFORMAT_NV21: printf("SDL_PIXELFORMAT_NV21\n"); break;
     }
     if (render_flags & SDL_RENDERER_PRESENTVSYNC) {
-        app_context->delay = calibrate_delay(app_context->renderer) - 1;
+        SDL_RenderSetVSync(app_context->renderer, 1);
+        app_context->delay = calibrate_delay(app_context) - 1;
         app_context->delay = MAX(app_context->delay, 1);
     }
     return false;
@@ -449,4 +464,3 @@ void print_app_runtime_info(app_context* app_context) {
            app_context->max_iters,
            SDL_GetPerformanceFrequency());
 }
-
