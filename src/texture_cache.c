@@ -19,27 +19,22 @@
 typedef struct tcache_entry tcache_entry;
 
 struct tcache_entry {
-    tcache_entry*       lru_prev;
-    tcache_entry*       lru_next;
+    // value of 0 => inuse forever
+    int64_t             inuse_counter;
     const char*         path;
     uint32_t            hashv;
-    texture_id_t        id;
     const SDL_Texture*  texture;
     bool                ejected;
+    int                 w,h;
+    int                 num_bytes;
 };
 
-// LRU linked list variables
-static tcache_entry ht[3]= {
-    { .lru_prev=&ht[1], .lru_next=&ht[1], .path="", },
-    { .lru_prev=&ht[0], .lru_next=&ht[0], .path="", },
-    { .path="", },
+static tcache_entry empty_tce = {
+    .path = "___empty___",
 };
-// LRU Head
-static tcache_entry* lru_head = &ht[0];
-// LRU Tail
-static tcache_entry* lru_tail = &ht[1];
-// Place holder
-static tcache_entry* tce_empty = &ht[2];
+
+int64_t global_inuse_counter = 1;
+uint64_t num_texture_bytes = 0;
 
 #define PRIME2K 2039
 #define PRIME4k 4093
@@ -53,33 +48,58 @@ static tcache_entry* tce_empty = &ht[2];
 
 #define HASHTPRIME PRIME4k
 #define COLLISION_STEP PRIME32k
-static tcache_entry* tbl[HASHTPRIME];
+#define NUM_TBL_ENTRIES HASHTPRIME+1
+static tcache_entry* tbl[NUM_TBL_ENTRIES];
+
+void tcache_init(void) {
+    static bool initialised = false;
+    if (!initialised) {
+        initialised = true;
+        tbl[NUM_TBL_ENTRIES-1] = &empty_tce;
+    }
+}
 
 static uint32_t hashfn(const char* token) {
     return CityHash32(token, strlen(token));
 }
 
-// Add cache entry to the LRU list
 static void recently_used(tcache_entry* tce) {
     if (tce) {
-        if (tce->lru_prev) {
-            // delink
-            tce->lru_prev->lru_next = tce->lru_next;
-            tce->lru_next->lru_prev = tce->lru_prev;
-        } else {
-            tcache_printf("recently_used: new: tce=%p %d %s\n", tce, tce->id, tce->path);
-        }
-
-        // insert at head
-        tce->lru_next = lru_head->lru_next;
-        tce->lru_next->lru_prev = tce;
-        lru_head->lru_next = tce;
-        tce->lru_prev = lru_head;
-        tcache_printf("recently_used: tce=%p %d\n", tce, tce->id);
+        tce->inuse_counter = ++global_inuse_counter;
+//        tcache_printf("recently_used: tce=%p %ld %s\n", tce, tce->inuse_counter, tce->path);
     } else {
         error_printf("recently_used: tce=%p\n", tce);
     }
 }
+
+static void release_texture(tcache_entry* tce) {
+    if (tce && tce->texture) {
+        SDL_DestroyTexture((SDL_Texture*)tce->texture);
+        tce->texture = NULL;
+        num_texture_bytes -= tce->num_bytes;
+        tce->w = tce->h = tce->num_bytes = 0;
+        tcache_printf("release_texture: texture_bytes=%d\n", num_texture_bytes);
+    }
+}
+
+static void update_texture(tcache_entry* tce, const SDL_Texture* texture) {
+    tcache_init();
+    if (tce) {
+        if (tce->texture) {
+            release_texture(tce);
+        }
+        if (texture) {
+            Uint32 fmt;
+            if (0 == SDL_QueryTexture((SDL_Texture*)texture, &fmt, NULL, &tce->w, &tce->h)) {
+                tce->num_bytes = SDL_BYTESPERPIXEL(fmt) * tce->w * tce->h;
+                num_texture_bytes += tce->num_bytes;
+                tcache_printf("update_texture: texture_bytes=%d\n", num_texture_bytes);
+            }
+            tce->texture = texture;
+        }
+    }
+}
+
 
 // Add texture 
 // path: path to image file - or unique string identifier
@@ -95,38 +115,30 @@ texture_id_t tcache_put_texture(const char* path, const SDL_Texture* texture, bo
 
     for(int count=0; count < HASHTPRIME; ++count) {
         tcache_entry* tce = tbl[indx];
-        if (tce == NULL || tce == tce_empty || (tce->hashv == hashv && 0 == strcmp(path,  tce->path))) {
-            if (tce == NULL || tce == tce_empty) {
-                tce = calloc(1, sizeof(*tce));
+        // indx 0 -> reserved for uninitialised 
+        if (indx) {
+            if (tce == NULL || (tce->hashv == hashv && 0 == strcmp(path,  tce->path))) {
                 if (tce == NULL) {
-                    exit(EXIT_FAILURE);
+                    tce = calloc(1, sizeof(*tce));
+                    if (tce == NULL) {
+                        error_printf("tcache_put_texture: Out of memory\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    tbl[indx] = tce;
+                    tce->path = strdup(path);
+                    update_texture(tce, texture);
+                    tce->hashv = hashv;
+                    tcache_printf("tcache_put_texture: new: tce=%p %d %s\n", tce, indx, tce->path);
+                } else {
+                    update_texture(tce, texture);
+                    tce->ejected = false;
+                    tcache_printf("tcache_put_texture: changed: tce=%p %d %s\n", tce, indx, tce->path);
                 }
-                tbl[indx] = tce;
-                tce->path = strdup(path);
-                tce->texture = texture;
-                tce->hashv = hashv;
-                tce->id = indx;
-                tcache_printf("tcache_put_texture: new: tce=%p %d %s\n", tce, tce->id, tce->path);
-            } else {
-                if (texture && tce->texture) {
-                    SDL_DestroyTexture((SDL_Texture*)tce->texture);
-                    tce->texture = texture;
+                if (ejectable) {
+                    recently_used(tce);
                 }
-                tce->ejected = false;
-                tcache_printf("tcache_put_texture: changed: tce=%p %d %s\n", tce, tce->id, tce->path);
+                return indx;
             }
-            if (ejectable) {
-                recently_used(tce);
-            } else {
-                if (tce->lru_prev) {
-                    // delink
-                    tce->lru_prev->lru_next = tce->lru_next;
-                    tce->lru_next->lru_prev = tce->lru_prev;
-                }
-                tce->lru_prev = NULL;
-                tce->lru_next = NULL;
-            }
-            return indx;
         }
         tcache_printf("tcache_put_texture: collision: hop:%d %d %u %s %s\n",
                hop_count, indx, hashv, path, tbl[indx]->path);
@@ -142,19 +154,16 @@ texture_id_t tcache_put_texture(const char* path, const SDL_Texture* texture, bo
 // texture: texture 
 // returns: true for success, false otherwise
 //          false ==> invalid ID or uninitialised quick access slot.
-bool tcache_set_texture(texture_id_t texture_id, SDL_Texture* texture) {
-    if (texture_id < 0 || texture_id >= HASHTPRIME) {
+bool tcache_set_texture(texture_id_t texture_id, const SDL_Texture* texture) {
+    if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_set_texture: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
     }
     tcache_entry* tce = tbl[texture_id];
     if (tce) {
-        if (tce->texture) {
-            SDL_DestroyTexture((SDL_Texture*)tce->texture);
-        }
-        tce->texture = texture;
+        update_texture(tce, texture);
         tce->ejected = false;
-        tcache_printf("tcache_set_texture: changed: tce=%p %d %s\n", tce, tce->id, tce->path);
+        tcache_printf("tcache_set_texture: changed: tce=%p %d %s\n", tce, texture_id, tce->path);
         return true;
     } else {
         error_printf("tcache_set_texture: null entry: %d\n", texture_id);
@@ -167,7 +176,7 @@ bool tcache_set_texture(texture_id_t texture_id, SDL_Texture* texture) {
 // texture_id*: quick access texture ID
 // returns: texture, NULL is the texture is not found
 //          texture ID or -1 is texture is not found
-const SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
+SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
     uint32_t hashv = hashfn(path);
     texture_id_t indx = hashv%HASHTPRIME;
     tcache_entry* tce = tbl[indx];
@@ -175,13 +184,15 @@ const SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id
     for(int count=0; count < HASHTPRIME; ++count) {
         if (tce && (tce->hashv == hashv && 0 == strcmp(path,  tce->path))) {
 //            tcache_printf("tcache_get_texture: OK: %s\n", tce->path);
-            if (tce->lru_prev) {
+
+            if (tce->inuse_counter) {
                 recently_used(tce);
             }
+
             if (texture_id) {
                 *texture_id = indx;
             }
-            return tce->texture;
+            return (SDL_Texture *)tce->texture;
         }
         indx = (indx+COLLISION_STEP)%HASHTPRIME;
         tce = tbl[indx];
@@ -198,19 +209,20 @@ const SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id
 // texture_id*: quick access texture ID
 // returns: texture, NULL is the texture is not found
 //          texture ID or -1 is texture is not found
-const SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
-    if (texture_id < 0 || texture_id >= HASHTPRIME) {
+SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
+    if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_quick_get_texture: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
     }
     tcache_entry* tce = tbl[texture_id];
-    if (tce && tce != tce_empty) {
+    if (tce) {
 //        tcache_printf("tcache_quick_get_texture: %d %u %s\n", texture_id, tce->hashv, tce->path);
-        if (tce->lru_prev) {
+
+        if (tce->inuse_counter) {
             recently_used(tce);
         }
-        return tce->texture;
-    } else {
+
+        return (SDL_Texture *)tce->texture;
     }
     error_printf("tcache_quick_get_texture: none: %d\n", texture_id);
     return NULL;
@@ -221,7 +233,7 @@ const SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
 // returns: texture, NULL is the texture is not found
 //          texture ID or -1 is texture is not found
 bool tcache_quick_get_texture_ejected(texture_id_t texture_id) {
-    if (texture_id < 0 || texture_id >= HASHTPRIME) {
+    if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_quick_get_texture_ejected: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
     }
@@ -236,25 +248,20 @@ bool tcache_quick_get_texture_ejected(texture_id_t texture_id) {
 // Delete texture 
 // texture_id*: quick access texture ID
 bool tcache_quick_delete_texture(texture_id_t texture_id) {
-    if (texture_id < 0 || texture_id >= HASHTPRIME) {
+    if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_quick_delete_texture: invalid id: %d\n", texture_id);
         exit(EXIT_FAILURE);
         return false;
     }
     tcache_entry* tce = tbl[texture_id];
     if (tce) {
-        if (tce->lru_prev) {
-            tcache_printf("tcache_quick_delete_texture: LRU delink: %d\n", texture_id);
-            // delink
-            tce->lru_prev->lru_next = tce->lru_next;
-            tce->lru_next->lru_prev = tce->lru_prev;
+        tcache_printf("tcache_quick_delete_texture: LRU delink: %d %p\n", texture_id, tce);
+        release_texture(tce);
+        if (tce->path) {
+            free((void *)tce->path);
         }
-        if (tce->texture) {
-            SDL_DestroyTexture((SDL_Texture* )tce->texture);
-        }
-        free((void *)tce->path);
         free(tce);
-        tbl[texture_id] = tce_empty;
+        tbl[texture_id] = NULL;
         return true;
     } else {
         error_printf("tcache_quick_delete_texture: none: %d\n", texture_id);
@@ -283,19 +290,25 @@ bool tcache_delete_texture(const char* path) {
 
 // Eject least recently used texture
 bool tcache_eject_lru() {
-    if (lru_tail->lru_prev != lru_head) {
-        // delink
-        tcache_entry* tce = lru_tail->lru_prev;
-        tce->lru_prev->lru_next = lru_tail;
-        lru_tail->lru_prev = tce->lru_prev;
-        // lru_prev != NULL => ejectable
-        tce->lru_prev = tce_empty;
-        tce->ejected = true;
-        if (tce->texture) {
-            SDL_DestroyTexture((SDL_Texture* )tce->texture);
-            tce->texture = NULL;
+    texture_id_t indx = -1;
+    tcache_entry dummy = { .inuse_counter=global_inuse_counter, .texture=NULL, .path="" };
+    tcache_entry* candidate_tce = &dummy;
+    for(texture_id_t ix=0; ix < HASHTPRIME; ++ix) {
+        tcache_entry* tce = tbl[ix];
+        if (tce) {
+            if (tce->inuse_counter && tce->texture && tce->inuse_counter < candidate_tce->inuse_counter) {
+                candidate_tce = tce;
+                indx = ix;
+            }
         }
-        tcache_printf("tcache_eject_lru: %d %s\n", tce->id, tce->path);
+    }
+
+    if (candidate_tce && candidate_tce != &dummy) {
+        candidate_tce->ejected = true;
+        if (candidate_tce->texture) {
+            release_texture(candidate_tce);
+        }
+        tcache_printf("tcache_eject_lru: %d %s\n", indx, candidate_tce->path);
         return true;
     } else {
         tcache_printf("tcache_eject_lru: nothing to eject\n");
@@ -309,20 +322,24 @@ bool tcache_eject_lru() {
 // returns : texture, NULL is the texture is not found
 //          texture ID or -1 is texture is not found
 bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
-    if (texture_id < 0 || texture_id >= HASHTPRIME) {
+    if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_load_from_file: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
     }
     tcache_entry* tce = tbl[texture_id];
+    if (tce == &empty_tce) {
+        return true;
+    }
     if (tce) {
+        // Only load if not previously loaded
         if (tce->texture == NULL) {
-            tce->texture = IMG_LoadTexture(renderer, tce->path);
+            update_texture(tce, IMG_LoadTexture(renderer, tce->path));
             if (NULL == tce->texture) {
-                error_printf("tcache_load_from_file: failed: %s\n", tce->path);
+                error_printf("tcache_load_from_file: failed: %d %s\n", texture_id, tce->path);
             }
-            if (tce->lru_prev) {
-                recently_used(tce);
-            }
+        }
+        if (tce->inuse_counter) {
+            recently_used(tce);
         }
         return tce->texture != NULL;
     }
@@ -336,7 +353,7 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
 // ejectable : flag to enable ejecting of the texture
 // returns: texture, NULL is the texture is not found
 //          texture ID or -1 is texture is not found
-texture_id_t  tcache_load_media(const char* path, SDL_Renderer* renderer, bool ejectable) {
+texture_id_t  tcache_load_media(const char* path, SDL_Renderer* renderer, bool ejectable, bool* ploaded) {
     texture_id_t texture_id = tcache_put_texture(path, NULL, ejectable);
     tcache_printf("tcache_load_media: id=%d path=%s\n", texture_id, path);
     bool loaded = tcache_load_from_file(texture_id, renderer);
@@ -344,45 +361,116 @@ texture_id_t  tcache_load_media(const char* path, SDL_Renderer* renderer, bool e
         tcache_eject_lru();
         loaded = tcache_load_from_file(texture_id, renderer);
     }
+    if (ploaded) {
+        *ploaded = loaded;
+    }
     tcache_printf("tcache_load_media: id=%d path=%s loaded=%u\n", texture_id, path, (unsigned)loaded);
     return texture_id;
 }
 
+
+static void swap_tcache_entries(tcache_entry** a, tcache_entry** b) {
+  tcache_entry* t = *a;
+  *a = *b;
+  *b = t;
+}
+
+static int qs_tcache_partition(tcache_entry** tce_arr, int lo, int hi) {
+    // last element is the pivot
+    tcache_entry* pivot = tce_arr[hi];
+
+    // temp pivot
+    int i = lo-1;
+    for (int j = lo; j < hi; j++) {
+        // if the current element <= pivot 
+        if (tce_arr[j]->inuse_counter <= pivot->inuse_counter) {
+            // move temporary pivot index forward
+            ++i;
+            // swap current element with temporary pivot
+            swap_tcache_entries(tce_arr+i, tce_arr+j);
+        }
+    }
+    // swap last element with pivot
+    swap_tcache_entries(tce_arr+i+1, tce_arr+hi);
+    // return pivot index
+    return i+1;
+}
+
+static void qs_tcache_range(tcache_entry** tce_arr, int lo, int hi) {
+    if (lo < hi) {
+        // partition the array to get the pivot index
+        int pivot = qs_tcache_partition(tce_arr, lo, hi);
+        // sort the left side
+        qs_tcache_range(tce_arr, lo, pivot-1);
+        // sort the right side
+        qs_tcache_range(tce_arr, pivot+1, hi);
+    }
+}
+
+static void quick_sort_tcache(tcache_entry** tce_arr, int num_elements) {
+    qs_tcache_range(tce_arr, 0, num_elements-1);
+}
+
+//static int comp(const void* a, const void *b) {
+//    return ((tcache_entry*)a)->inuse_counter - ((tcache_entry*)b)->inuse_counter;
+//}
+
+static tcache_entry* stbl[HASHTPRIME];
 void tcache_dump() {
     {
         int count = 0;
         int last_ix = 0;
+        int ix_s = 0;
         printf("texture cache dump:\n");
         printf("-----------------------------\n");
         for(int ix=0; ix < HASHTPRIME; ++ix) {
             tcache_entry* tce = tbl[ix];
             if (tce) {
-                printf("    %d) delta=%4d hashv=%08x %p %p %p %s\n", ix, ix - last_ix,
+                printf("    %05d) delta=%4d hashv=%08x inuse=%016lx %p w=%4d h=%4d bytes=%8d %s\n",
+                       ix, ix - last_ix,
                        tce->hashv,
-                       tce->lru_prev,
+                       tce->inuse_counter,
                        tce,
-                       tce->lru_next,
+                       tce->w,
+                       tce->h,
+                       tce->num_bytes,
                        tce->path);
                 ++count;
                 last_ix = ix;
+                stbl[ix_s] = tce;
+                ++ix_s;
             }
         }
+        printf("Number of hashtable entries=%d\n", HASHTPRIME);
         printf("Occupancy %f %d/%d\n", ((float)count/HASHTPRIME)*100, count, HASHTPRIME);
-    }
-    printf("-----------------------------\n");
-    printf("LRU:\n");
-    {
-        int lru_count = 0;
-        for(tcache_entry* tce = lru_tail->lru_prev; tce != lru_head; tce = tce->lru_prev) {
-                printf("    %d) hashv=%08x %p %p %p %s\n", tce->id,
+        printf("Memory used for table entries = %ld\n", count * sizeof(tcache_entry));
+        printf("Sizeof cache_entry = %ld\n", sizeof(tcache_entry));
+        printf("Sizeof table = %ld\n", sizeof(tbl));
+//        qsort(stbl, count, sizeof(stbl[0]), tcache_compare);
+        quick_sort_tcache(stbl, count);
+        printf("LRU: ------------------------\n");
+        for(int ix=0; ix < count; ++ix) {
+            tcache_entry* tce = stbl[ix];
+                printf("    %5d) hashv=%08x inuse=%016lx %p %s\n", ix,
                        tce->hashv,
-                       tce->lru_prev,
+                       tce->inuse_counter,
                        tce,
-                       tce->lru_next,
                        tce->path);
-                ++lru_count;
         }
-        printf("Occupancy %f %d/%d\n", ((float)lru_count/HASHTPRIME)*100, lru_count, HASHTPRIME);
+        printf("Number of hashtable entries=%d\n", HASHTPRIME);
+        printf("Occupancy %f %d/%d\n", ((float)count/HASHTPRIME)*100, count, HASHTPRIME);
+        printf("Memory used for table entries = %ld\n", count * sizeof(tcache_entry));
+        printf("Sizeof cache_entry = %ld\n", sizeof(tcache_entry));
+        printf("Sizeof table = %ld\n", sizeof(tbl));
+        printf("Texture bytes = %ld\n", num_texture_bytes);
     }
     printf("-----------------------------\n");
+}
+
+int64_t tcache_get_texture_bytes_count(void) {
+    return num_texture_bytes;
+}
+
+texture_id_t tcache_get_empty_tid(void) {
+    return NUM_TBL_ENTRIES -1;
 }

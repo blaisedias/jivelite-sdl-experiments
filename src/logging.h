@@ -35,5 +35,6 @@ typedef enum {
 }vu_printf_typ;
 
 void enable_printf(vu_printf_typ v);
+void disable_printf(vu_printf_typ v);
 
 #endif

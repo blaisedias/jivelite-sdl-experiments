@@ -145,6 +145,7 @@ TEST_WIDGETS_JSON_OBJS =  \
 	$(OBJS_DIR)/vumeter_util.o \
 	$(OBJS_DIR)/visualizer.o \
 	$(OBJS_DIR)/vis_vumeter.o \
+	$(OBJS_DIR)/city.o $(OBJS_DIR)/texture_cache.o \
 	$(OBJS_DIR)/platform_linux.o
 
 $(BIN_DIR)/test_widgets_json : $(OBJS_DIR)/test_widgets_json.o $(TEST_WIDGETS_JSON_OBJS) | $(BIN_DIR)
