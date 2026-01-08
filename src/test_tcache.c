@@ -840,7 +840,7 @@ int main(int argc, const char** argv) {
     // load media
     for(int ix=0; ix < num_images; ++ix) {
         sprintf(path_buff, "%s/%s", argv[1], pngs[ix]);
-        ids[ix] = tcache_load_media(path_buff, renderer, true, loaded+ix);
+        ids[ix] = tcache_load_media(path_buff, renderer, loaded+ix);
     }
     tcache_dump();
 
@@ -901,12 +901,15 @@ int main(int argc, const char** argv) {
     // check ejectable LRU expulsion
     for(int ix=0; ix < num_images; ++ix) {
         sprintf(path_buff, "%s/%s", argv[1], pngs[ix]);
-        ids[ix] = tcache_load_media(path_buff, renderer, (ix%2)==0, loaded+ix);
+        ids[ix] = tcache_load_media(path_buff, renderer, loaded+ix);
+        if (ix%2 == 0) {
+            tcache_lock_texture(ids[ix]);
+        }
     }
     tcache_dump();
     enable_printf(TEXTURE_CACHE_PRINTF);
     for(int ix=0; ix < num_images; ++ix) {
-        if(ix%2 == 0) {
+        if(ix%2 != 0) {
             const SDL_Texture *texture2;
             if (tcache_eject_lru() ) {
                 texture2 = tcache_quick_get_texture(ids[ix]);
@@ -926,7 +929,7 @@ int main(int argc, const char** argv) {
     }
     disable_printf(TEXTURE_CACHE_PRINTF);
     for(int ix=0; ix < num_images; ++ix) {
-        if(ix%2 != 0) {
+        if(ix%2 == 0) {
             const SDL_Texture *texture2;
             if (tcache_quick_get_texture_ejected(ids[ix])) {
                 printf("%d) texture falsely reported as ejected id=%d %p\n", ix, ids[ix], texture2);

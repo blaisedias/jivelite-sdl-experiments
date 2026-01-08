@@ -24,9 +24,10 @@ struct tcache_entry {
     const char*         path;
     uint32_t            hashv;
     const SDL_Texture*  texture;
-    bool                ejected;
     int                 w,h;
     int                 num_bytes;
+    bool                ejected;
+    bool                locked;
 };
 
 static tcache_entry empty_tce = {
@@ -104,11 +105,10 @@ static void update_texture(tcache_entry* tce, const SDL_Texture* texture) {
 // Add texture 
 // path: path to image file - or unique string identifier
 // texture: texture 
-// ejectable:  whether the texture is ejectable
 //             typically false for texture which cannot be loaded from image files.
 //             for example textures created to render text.
 // returns: texture ID (quick access slot in the hash table)
-texture_id_t tcache_put_texture(const char* path, const SDL_Texture* texture, bool ejectable) {
+texture_id_t tcache_put_texture(const char* path, const SDL_Texture* texture) {
     uint32_t hashv = hashfn(path);
     texture_id_t indx = hashv%HASHTPRIME;
     int hop_count = 0;
@@ -134,9 +134,7 @@ texture_id_t tcache_put_texture(const char* path, const SDL_Texture* texture, bo
                     tce->ejected = false;
                     tcache_printf("tcache_put_texture: changed: tce=%p %d %s\n", tce, indx, tce->path);
                 }
-                if (ejectable) {
-                    recently_used(tce);
-                }
+                recently_used(tce);
                 return indx;
             }
         }
@@ -184,10 +182,7 @@ SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
     for(int count=0; count < HASHTPRIME; ++count) {
         if (tce && (tce->hashv == hashv && 0 == strcmp(path,  tce->path))) {
 //            tcache_printf("tcache_get_texture: OK: %s\n", tce->path);
-
-            if (tce->inuse_counter) {
-                recently_used(tce);
-            }
+            recently_used(tce);
 
             if (texture_id) {
                 *texture_id = indx;
@@ -218,10 +213,7 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
     tcache_entry* tce = tbl[texture_id];
     if (tce) {
 //        tcache_printf("tcache_quick_get_texture: %d %u %s\n", texture_id, tce->hashv, tce->path);
-
-        if (tce->inuse_counter) {
-            recently_used(tce);
-        }
+        recently_used(tce);
 
         // stored as a const - callers require a pointer which is not const
         return (SDL_Texture *)tce->texture;
@@ -298,7 +290,7 @@ bool tcache_eject_lru() {
     for(texture_id_t ix=0; ix < HASHTPRIME; ++ix) {
         tcache_entry* tce = tbl[ix];
         if (tce) {
-            if (tce->inuse_counter && tce->texture && tce->inuse_counter < candidate_tce->inuse_counter) {
+            if (!tce->locked && tce->texture && tce->inuse_counter < candidate_tce->inuse_counter) {
                 candidate_tce = tce;
                 indx = ix;
             }
@@ -340,9 +332,7 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
                 error_printf("tcache_load_from_file: failed: %d %s\n", texture_id, tce->path);
             }
         }
-        if (tce->inuse_counter) {
-            recently_used(tce);
-        }
+        recently_used(tce);
         return tce->texture != NULL;
     }
     error_printf("tcache_load_from_file: none: %d\n", texture_id);
@@ -352,11 +342,10 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
 // Load texture from file and add it to the texture cache.
 // path : path to image file
 // renderer : SDL renderer context
-// ejectable : flag to enable ejecting of the texture
 // returns: texture, NULL is the texture is not found
 //          texture ID or -1 is texture is not found
-texture_id_t  tcache_load_media(const char* path, SDL_Renderer* renderer, bool ejectable, bool* ploaded) {
-    texture_id_t texture_id = tcache_put_texture(path, NULL, ejectable);
+texture_id_t  tcache_load_media(const char* path, SDL_Renderer* renderer, bool* ploaded) {
+    texture_id_t texture_id = tcache_put_texture(path, NULL);
     tcache_printf("tcache_load_media: id=%d path=%s\n", texture_id, path);
     bool loaded = tcache_load_from_file(texture_id, renderer);
     if (!loaded) {
@@ -428,10 +417,11 @@ void tcache_dump() {
         for(int ix=0; ix < HASHTPRIME; ++ix) {
             tcache_entry* tce = tbl[ix];
             if (tce) {
-                printf("    %05d) delta=%4d hashv=%08x inuse=%016lx %p w=%4d h=%4d bytes=%8d %s\n",
+                printf("    %05d) delta=%4d hashv=%08x inuse=%016lx %s %p w=%4d h=%4d bytes=%8d %s\n",
                        ix, ix - last_ix,
                        tce->hashv,
                        tce->inuse_counter,
+                       tce->locked ? "locked  ": "unlocked",
                        tce,
                        tce->w,
                        tce->h,
@@ -476,4 +466,44 @@ int64_t tcache_get_texture_bytes_count(void) {
 texture_id_t tcache_get_empty_tid(void) {
     tcache_init();
     return NUM_TBL_ENTRIES -1;
+}
+
+bool tcache_lock_texture(texture_id_t texture_id) {
+    if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
+        error_printf("tcache_lock_texture: invalid id %d\n", texture_id);
+        exit(EXIT_FAILURE);
+    }
+    tcache_entry* tce = tbl[texture_id];
+    if (tce) {
+        tce->locked = true;
+    }
+    return tce != NULL;
+}
+
+bool tcache_unlock_texture(texture_id_t texture_id) {
+    if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
+        error_printf("tcache_unlock_texture: invalid id %d\n", texture_id);
+        exit(EXIT_FAILURE);
+    }
+    tcache_entry* tce = tbl[texture_id];
+    if (tce) {
+        tce->locked = false;
+    }
+    return tce != NULL;
+}
+
+// Get the texture id matching a token
+// This function can be expensive in terms of execution time,
+// especially if the token does not exist
+texture_id_t tcache_get_texture_id(const char* token) {
+    uint32_t hashv = hashfn(token);
+    texture_id_t indx = hashv%HASHTPRIME;
+
+    for(int count=0; count < HASHTPRIME; ++count, ++indx) {
+        tcache_entry* tce = tbl[indx];
+        if (tce && (tce->hashv == hashv && 0 == strcmp(token,  tce->path))) {
+            return indx;
+        }
+    }
+    return INVALID_TEXTURE_ID;
 }
