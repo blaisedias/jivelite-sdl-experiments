@@ -7,15 +7,6 @@
 #include "vumeterdef.h"
 
 
-static void unload_media(vumeter_properties *vu) {
-    for(int indx = 0; indx < vu->resources.count; ++indx) {
-        if (NULL != vu->resources.textures && NULL != vu->resources.textures[indx]) {
-            SDL_DestroyTexture(vu->resources.textures[indx]);
-            vu->resources.textures[indx] = NULL;
-        }
-    }
-}
-
 // Resources enumeration
 enum resources_enum {
     RSRC_NULL,
@@ -80,7 +71,7 @@ static const char* resource_names[] = {
 };
 
 
-static SDL_Texture *textures[RSRC_COUNT];
+static texture_id_t textures[RSRC_COUNT];
 
 enum placements_enum {
     PLCMNT_NULL,
@@ -2823,7 +2814,7 @@ vumeter_properties VuProperties = {
     .volume_levels=50, .w=1935, .h=648,
     .vumeter_count=5, .vumeters=vumeters,
     .resources={.count=RSRC_COUNT, .names=resource_names, .textures=textures },
-    .placements={.count=PLCMNT_COUNT,.elements=placements },    .fn_release=unload_media,
+    .placements={.count=PLCMNT_COUNT,.elements=placements },
 };
 
 

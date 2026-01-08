@@ -123,26 +123,34 @@ SDL_bool VUMeter_load_media(SDL_Renderer *renderer, vumeter_properties *vu) {
             vu->resources.textures
     );
     for(indx = 0; indx < vu->resources.count; ++indx) {
-        if ( NULL != vu->resources.names[indx] && NULL == vu->resources.textures[indx]) {
-            int n = snprintf(load_buffer, sizeof(load_buffer), "%s/%s",
-                    vu->resource_path, vu->resources.names[indx]);
-            if (0 > n || n >= sizeof(load_buffer)) {
-                error_printf("snprintf %ld %s/%s/n",
-                        sizeof(load_buffer),
+        if (0 == vu->resources.textures[indx]) {
+            if ( NULL != vu->resources.names[indx]) {
+                int n = snprintf(load_buffer, sizeof(load_buffer), "%s/%s",
                         vu->resource_path, vu->resources.names[indx]);
-                exit(EXIT_FAILURE);
+                if (0 > n || n >= sizeof(load_buffer)) {
+                    error_printf("snprintf %ld %s/%s/n",
+                            sizeof(load_buffer),
+                            vu->resource_path, vu->resources.names[indx]);
+                    exit(EXIT_FAILURE);
+                }
+                bool loaded = false;
+                vu->resources.textures[indx] = tcache_load_media(load_buffer, renderer, &loaded);
+                ok = ok && loaded;
+            } else {
+                // if no texture is associated with a slot point to the empty entry, this 
+                //  - prevents error messages associated with retrieving texture for unintialised texture id
+                //  - allows use of the texture id slot without additional checks
+                vu->resources.textures[indx] = tcache_get_empty_tid();
             }
-            vu->resources.textures[indx] = IMG_LoadTexture(renderer, load_buffer);
-            if (vu->resources.textures[indx] == NULL) {
-                error_printf("failed to load %s\n", load_buffer);
-            }
-            ok = ok && (vu->resources.textures[indx] != NULL);
+        } else {
+            ok = ok && tcache_load_from_file(vu->resources.textures[indx], renderer);
         }
     }
     pc = SDL_GetPerformanceCounter() - pc;
-    perf_printf("load media %s time:%f milliseconds\n",
+    perf_printf("load media %s time:%f milliseconds ok=%s\n",
                 vu->name,
-                (((float)pc/SDL_GetPerformanceFrequency()*1000)));
+                (((float)pc/SDL_GetPerformanceFrequency()*1000)),
+                ok?"true":"false");
     return ok;
 }
 
@@ -156,10 +164,8 @@ void VUMeter_unload_media(vumeter_properties *vu) {
                 vu->resources.textures
         );
         for(int indx = 0; indx < vu->resources.count; ++indx) {
-            if (NULL != vu->resources.textures && NULL != vu->resources.textures[indx]) {
-                SDL_DestroyTexture(vu->resources.textures[indx]);
-                vu->resources.textures[indx] = NULL;
-            }
+            tcache_quick_delete_texture(vu->resources.textures[indx]);
+            vu->resources.textures[indx] = 0;
         }
     }
 }
@@ -250,7 +256,7 @@ vumeter_properties* VUMeter_scale(vumeter_properties* vu, int w_in, int h_in, fl
                 .count = vu->placements.count,
                 .elements = NULL,
             },
-            .fn_release = &release_properties,
+//            .fn_release = &release_properties,
             .vumeter_count = vu->vumeter_count,
         };
 
@@ -259,14 +265,14 @@ vumeter_properties* VUMeter_scale(vumeter_properties* vu, int w_in, int h_in, fl
         memcpy(resized_vu, &scaled_props, sizeof(*resized_vu));
     }
 
-    resized_vu->resources.textures = calloc(vu->resources.count, sizeof(SDL_Texture*));
+    resized_vu->resources.textures = calloc(vu->resources.count, sizeof(resized_vu->resources.textures[0]));
     if (NULL == resized_vu->resources.textures ) {
         error_printf("OOM textures\n");
         release_properties(resized_vu);
         return  NULL;
     }
 
-    resized_vu->placements.elements = calloc(vu->placements.count, sizeof(vumeter_element));
+    resized_vu->placements.elements = calloc(vu->placements.count, sizeof(resized_vu->placements.elements[0]));
     if (NULL == resized_vu->placements.elements ) {
         error_printf("OOM placements\n");
         release_properties(resized_vu);
@@ -396,23 +402,19 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
         const int *bg = vumeter->background->bg;
         while(bg != NULL && 0 != *bg) {
             vumeter_element *p = &vu->placements.elements[*bg];
-//            copyRect(&p->rect, &render_rect);
             rebaseRect(enclosure, &p->rect, &render_rect);
-            SDL_RenderCopyEx(renderer, vu->resources.textures[p->texture_index], NULL,
-                    &render_rect, vu->rotation, NULL, flip);
+            SDL_RenderCopyEx(renderer,
+                    tcache_quick_get_texture(vu->resources.textures[p->texture_index]),
+                    NULL, &render_rect, vu->rotation, NULL, flip);
             ++bg;
         }
     }
 
-#define X_RENDER_VOLUME_LEVEL_(value) SDL_RenderCopyEx(renderer,\
-        vu->resources.textures[vu->placements.elements[comp->placements[value]].texture_index], NULL,\
-        &vu->placements.elements[comp->placements[value]].rect,\
-        vu->rotation, NULL, flip)
-
 #define _RENDER_VOLUME_LEVEL_(value) \
         rebaseRect(enclosure, &vu->placements.elements[comp->placements[value]].rect, &render_rect); \
         SDL_RenderCopyEx(renderer,\
-        vu->resources.textures[vu->placements.elements[comp->placements[value]].texture_index], NULL,\
+        tcache_quick_get_texture(vu->resources.textures[vu->placements.elements[comp->placements[value]].texture_index]),\
+        NULL,\
         &render_rect,\
         vu->rotation, NULL, flip)
 
@@ -570,7 +572,7 @@ void VUMeter_dump_props(const vumeter_properties* props) {
             props->placements.elements
            );
     for(int indx=0; indx < props->resources.count; ++indx) {
-        printf("%d) texture=%p %s\n",
+        printf("%d) texture=%d %s\n",
                 indx,
                  props->resources.textures[indx],
                  props->resources.names[indx]
@@ -580,7 +582,7 @@ void VUMeter_dump_props(const vumeter_properties* props) {
     const int *bg = vumeter->background->bg;
     while(bg != NULL && 0 != *bg) {
         vumeter_element *p = &props->placements.elements[*bg];
-        printf("bg, texture_index=%02d texture=%p, rect=(%d, %d, %d, %d)\n",
+        printf("bg, texture_index=%02d texture=%d, rect=(%d, %d, %d, %d)\n",
                 p->texture_index,
                 props->resources.textures[p->texture_index],
                 p->rect.x, p->rect.y, p->rect.w, p->rect.h
@@ -597,7 +599,7 @@ void VUMeter_dump_props(const vumeter_properties* props) {
                 int pi = comp->placements[value];
                 int ti = props->placements.elements[pi].texture_index;
                 SDL_Rect *r = &props->placements.elements[pi].rect;
-                printf("\tlevel=%d placement_index=%d texture_index=%d texture=%p rect=(%d,%d,%d,%d) %s\n",
+                printf("\tlevel=%d placement_index=%d texture_index=%d texture=%d rect=(%d,%d,%d,%d) %s\n",
                         value,
 //                        props->placements.elements[value].texture_index,
 //                        props->resources.textures[props->placements.elements[value].texture_index],
