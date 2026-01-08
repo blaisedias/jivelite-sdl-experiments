@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include "types.h"
 typedef int  texture_id_t;
+#define INVALID_TEXTURE_ID -1
 
 void tcache_init(void);
 texture_id_t tcache_put_texture(const char* token, const SDL_Texture* texture, bool ejectable);

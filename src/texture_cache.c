@@ -175,7 +175,7 @@ bool tcache_set_texture(texture_id_t texture_id, const SDL_Texture* texture) {
 // path: path to image file - or unique string identifier
 // texture_id*: quick access texture ID
 // returns: texture, NULL is the texture is not found
-//          texture ID or -1 is texture is not found
+//          texture ID or INVALID_TEXTURE_ID is texture is not found
 SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
     uint32_t hashv = hashfn(path);
     texture_id_t indx = hashv%HASHTPRIME;
@@ -192,6 +192,7 @@ SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
             if (texture_id) {
                 *texture_id = indx;
             }
+            // stored as a const - callers require a pointer which is not const
             return (SDL_Texture *)tce->texture;
         }
         indx = (indx+COLLISION_STEP)%HASHTPRIME;
@@ -200,7 +201,7 @@ SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
     }
     tcache_printf("tcache_get_texture: none: %u %s\n", hashv, path);
     if (texture_id) {
-        *texture_id = -1;
+        *texture_id = INVALID_TEXTURE_ID;
     }
     return NULL;
 }
@@ -208,7 +209,7 @@ SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
 // Get texture using the quick access texture ID
 // texture_id*: quick access texture ID
 // returns: texture, NULL is the texture is not found
-//          texture ID or -1 is texture is not found
+//          texture ID
 SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
     if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_quick_get_texture: invalid id %d\n", texture_id);
@@ -222,6 +223,7 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
             recently_used(tce);
         }
 
+        // stored as a const - callers require a pointer which is not const
         return (SDL_Texture *)tce->texture;
     }
     error_printf("tcache_quick_get_texture: none: %d\n", texture_id);
@@ -472,5 +474,6 @@ int64_t tcache_get_texture_bytes_count(void) {
 }
 
 texture_id_t tcache_get_empty_tid(void) {
+    tcache_init();
     return NUM_TBL_ENTRIES -1;
 }
