@@ -433,14 +433,19 @@ void tcache_dump() {
                 ++ix_s;
             }
         }
+/*        
         printf("Number of hashtable entries=%d\n", HASHTPRIME);
         printf("Occupancy %f %d/%d\n", ((float)count/HASHTPRIME)*100, count, HASHTPRIME);
         printf("Memory used for table entries = %ld\n", count * sizeof(tcache_entry));
         printf("Sizeof cache_entry = %ld\n", sizeof(tcache_entry));
         printf("Sizeof table = %ld\n", sizeof(tbl));
+*/
 //        qsort(stbl, count, sizeof(stbl[0]), tcache_compare);
         quick_sort_tcache(stbl, count);
         printf("LRU: ------------------------\n");
+        int64_t locked_texture_bytes=0;
+        int64_t unlocked_texture_bytes=0;
+        int64_t ejected_texture_bytes=0;
         for(int ix=0; ix < count; ++ix) {
             tcache_entry* tce = stbl[ix];
                 printf("    %5d) hashv=%08x inuse=%016lx %p %s\n", ix,
@@ -448,13 +453,24 @@ void tcache_dump() {
                        tce->inuse_counter,
                        tce,
                        tce->path);
+                if (tce->ejected) {
+                    ejected_texture_bytes += tce->num_bytes;
+                } else if (tce->locked) {
+                    locked_texture_bytes += tce->num_bytes;
+                } else {
+                    unlocked_texture_bytes += tce->num_bytes;
+                }
         }
         printf("Number of hashtable entries=%d\n", HASHTPRIME);
         printf("Occupancy %f %d/%d\n", ((float)count/HASHTPRIME)*100, count, HASHTPRIME);
         printf("Memory used for table entries = %ld\n", count * sizeof(tcache_entry));
         printf("Sizeof cache_entry = %ld\n", sizeof(tcache_entry));
         printf("Sizeof table = %ld\n", sizeof(tbl));
-        printf("Texture bytes = %ld\n", num_texture_bytes);
+        printf("Texture bytes = %ld %f MiB, locked=%ld %f MiB, unlocked=%ld %f MiB, ejected=%ld %f MiB\n", 
+                num_texture_bytes, (float)num_texture_bytes/(1024*1024),
+                locked_texture_bytes, (float)locked_texture_bytes/(1024*1024),
+                unlocked_texture_bytes, (float)unlocked_texture_bytes/(1024*1024),
+                ejected_texture_bytes, (float)ejected_texture_bytes/(1024*1024));
     }
     printf("-----------------------------\n");
 }
