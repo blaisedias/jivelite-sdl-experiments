@@ -4,6 +4,7 @@
 #include "util.h"
 #include "actions.h"
 #include "types.h"
+#include "texture_cache.h"
 
 #define  WH_FILL (-1)
 
@@ -55,14 +56,14 @@ typedef struct widget_list widget_list;
 typedef struct view_context view_context;
 
 typedef struct _btn_resource {
-    SDL_Texture *texture;
-    const char  *resource_path;
-    action      action;
+    texture_id_t    texture_id;
+    const char      *resource_path;
+    action          action;
 }_btn_resource;
 
 typedef struct _slider_resource {
-    const char* image_paths[2];
-    SDL_Texture* textures[2];
+    const char*     image_paths[2];
+    texture_id_t    texture_ids[2];
     int w;
     int h;
 }_slider_resource;
@@ -123,7 +124,7 @@ struct widget {
         vumeter_widget* vu;
         spmeter_widget* sp;
         struct {
-            SDL_Texture *texture;
+            texture_id_t texture_id;
             int w;
             int h;
             image_scaling scale_op;
@@ -131,7 +132,7 @@ struct widget {
             SDL_Rect dst_rect;
         }image;
         struct {
-            SDL_Texture *texture;
+            texture_id_t texture_id;
         }button;
         struct {
             unsigned state;

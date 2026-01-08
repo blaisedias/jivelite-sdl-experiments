@@ -75,8 +75,10 @@ static void button_widget_render(widget* wdgt) {
         SDL_Rect image_rect;
         copyRect(&wdgt->rect, &image_rect);
         translate_image_rect(&image_rect);
-        SDL_RenderCopyEx(wdgt->view->app->renderer, wdgt->sub.button.texture, NULL,
-            &image_rect, wdgt->view->app->orientation, NULL, flip);
+        SDL_RenderCopyEx(wdgt->view->app->renderer,
+                tcache_quick_get_texture(wdgt->sub.button.texture_id),
+                NULL,
+                &image_rect, wdgt->view->app->orientation, NULL, flip);
     }
 }
 
@@ -131,9 +133,11 @@ widget* widget_load_media(widget* wdgt, const char* resource_path) {
                 break;
             case WIDGET_IMAGE:
                 {
-                    wdgt->sub.image.texture = IMG_LoadTexture(wdgt->view->app->renderer, wdgt->image_path);
-                    if (wdgt->sub.image.texture) {
-                        if (0 == SDL_QueryTexture(wdgt->sub.image.texture, NULL, NULL, &wdgt->sub.image.w, &wdgt->sub.image.h)) {
+                    bool loaded = false;
+                    wdgt->sub.image.texture_id = tcache_load_media(wdgt->image_path, wdgt->view->app->renderer, &loaded);
+                    if (loaded) {
+                        tcache_lock_texture(wdgt->sub.image.texture_id);
+                        if (0 == SDL_QueryTexture(tcache_quick_get_texture(wdgt->sub.image.texture_id), NULL, NULL, &wdgt->sub.image.w, &wdgt->sub.image.h)) {
                             setup_image_fit_src_rect(wdgt);
                         }
                     } else {
@@ -141,16 +145,24 @@ widget* widget_load_media(widget* wdgt, const char* resource_path) {
                     }
                 }break;
             case WIDGET_BUTTON:
-                wdgt->sub.button.texture = IMG_LoadTexture(wdgt->view->app->renderer, wdgt->image_path);
-                if (wdgt->sub.button.texture == NULL) {
-                    error_printf("widget_load_media: button failed to load %s\n", wdgt->image_path);
+                {
+                    bool loaded = false;
+                    wdgt->sub.button.texture_id = tcache_load_media(wdgt->image_path, wdgt->view->app->renderer, &loaded);
+                    if (loaded) {
+                        tcache_lock_texture(wdgt->sub.button.texture_id);
+                    } else {
+                        error_printf("widget_load_media: button failed to load %s\n", wdgt->image_path);
+                    }
                 }
                 break;
             case WIDGET_MULTISTATE_BUTTON:
                 for(int ims=0; ims < wdgt->sub.multistate_button.state_count; ++ims) {
+                    bool loaded = false;
                     _btn_resource* res = wdgt->sub.multistate_button.res + ims;
-                    res->texture = IMG_LoadTexture(wdgt->view->app->renderer, res->resource_path);
-                    if (res->texture == NULL) {
+                    res->texture_id = tcache_load_media(res->resource_path, wdgt->view->app->renderer, &loaded);
+                    if (loaded) {
+                        tcache_lock_texture(res->texture_id);
+                    } else {
                         error_printf("widget_load_media: multistate button failed to load %s\n", res->resource_path);
                     }
                 }
@@ -159,8 +171,14 @@ widget* widget_load_media(widget* wdgt, const char* resource_path) {
                 for(int ix=0; ix<SLIDER_RESOURCE_COUNT; ++ix) {
                     for(int ix_img=0; ix_img < sizeof(wdgt->sub.slider.res[ix].image_paths)/sizeof(wdgt->sub.slider.res[ix].image_paths[0]); ++ix_img) {
                         if (wdgt->sub.slider.res[ix].image_paths[ix_img]) {
-                            wdgt->sub.slider.res[ix].textures[ix_img] = IMG_LoadTexture(wdgt->view->app->renderer, wdgt->sub.slider.res[ix].image_paths[ix_img]);
-                            if (wdgt->sub.slider.res[ix].textures[ix_img] == NULL) {
+                            bool loaded = false;
+                            wdgt->sub.slider.res[ix].texture_ids[ix_img] = tcache_load_media(
+                                    wdgt->sub.slider.res[ix].image_paths[ix_img],
+                                    wdgt->view->app->renderer,
+                                    &loaded);
+                            if (loaded) {
+                                tcache_lock_texture(wdgt->sub.slider.res[ix].texture_ids[ix_img]);
+                            } else {
                                  error_printf("widget_load_media: slider failed to load %d %s\n", ix, wdgt->sub.slider.res[ix].image_paths[ix_img]);
                             }
                         }
@@ -278,13 +296,16 @@ widget* widget_destroy(widget* wdgt) {
                 vumeter_widget_destroy(wdgt);
                 break;
             case WIDGET_IMAGE:
+                tcache_unlock_texture(wdgt->sub.image.texture_id);
                 break;
             case WIDGET_BUTTON:
+                tcache_unlock_texture(wdgt->sub.button.texture_id);
                 break;
             case WIDGET_MULTISTATE_BUTTON:
                 {
                     _btn_resource* res =  wdgt->sub.multistate_button.res;
                     for(int ims=0; ims < wdgt->sub.multistate_button.state_count; ++ims) {
+                        tcache_unlock_texture(res[ims].texture_id);
                         free((void *)res[ims].resource_path);
                     }
                     free(res);
@@ -293,10 +314,8 @@ widget* widget_destroy(widget* wdgt) {
             case WIDGET_SLIDER:
                 for(int ix=0; ix<SLIDER_RESOURCE_COUNT; ++ix) {
                     for(int ix_txtr=0; ix_txtr < sizeof(wdgt->sub.slider.res[ix].image_paths)/sizeof(wdgt->sub.slider.res[ix].image_paths[0]); ++ix_txtr) {
-                        if ( wdgt->sub.slider.res[ix].textures[ix_txtr] ) {
-                            SDL_DestroyTexture(wdgt->sub.slider.res[ix].textures[ix_txtr]);
-                            wdgt->sub.slider.res[ix].textures[ix_txtr] = NULL;
-                        }
+                        tcache_unlock_texture(wdgt->sub.slider.res[ix].texture_ids[ix_txtr]);
+                        wdgt->sub.slider.res[ix].texture_ids[ix_txtr] = 0;
                     }
                     for(int ix_img=0; ix_img < sizeof(wdgt->sub.slider.res[ix].image_paths)/sizeof(wdgt->sub.slider.res[ix].image_paths[0]); ++ix_img) {
                         if ( wdgt->sub.slider.res[ix].image_paths[ix_img] ) {
@@ -337,16 +356,24 @@ static void image_widget_render(widget* wdgt) {
 
     switch(wdgt->sub.image.scale_op) {
         case IMAGE_STRETCH_FILL:
-            SDL_RenderCopyEx(wdgt->view->app->renderer, wdgt->sub.image.texture, NULL,
-                &image_rect, wdgt->view->app->orientation, NULL, flip);
+            SDL_RenderCopyEx(wdgt->view->app->renderer,
+                   tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                   NULL, &image_rect,
+                   wdgt->view->app->orientation,
+                   NULL, flip);
             break;
         case IMAGE_FIT:
-            SDL_RenderCopyEx(wdgt->view->app->renderer, wdgt->sub.image.texture, NULL,
-                &wdgt->sub.image.dst_rect, wdgt->view->app->orientation, NULL, flip);
+            SDL_RenderCopyEx(wdgt->view->app->renderer,
+                   tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                   NULL, &wdgt->sub.image.dst_rect,
+                   wdgt->view->app->orientation, NULL, flip);
             break;
         case IMAGE_CENTRED_FILL:
-            SDL_RenderCopyEx(wdgt->view->app->renderer, wdgt->sub.image.texture, &wdgt->sub.image.src_rect,
-                &image_rect, wdgt->view->app->orientation, NULL, flip);
+            SDL_RenderCopyEx(wdgt->view->app->renderer,
+                    tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                    &wdgt->sub.image.src_rect, &image_rect,
+                    wdgt->view->app->orientation,
+                    NULL, flip);
             break;
     }
 }
@@ -430,8 +457,9 @@ static void multistate_button_widget_render(widget* wdgt) {
         copyRect(&wdgt->rect, &image_rect);
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-            wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].texture, NULL,
-            &image_rect, wdgt->view->app->orientation, NULL, flip);
+            tcache_quick_get_texture(wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].texture_id),
+            NULL, &image_rect,
+            wdgt->view->app->orientation, NULL, flip);
     }
 }
 
@@ -455,13 +483,18 @@ widget* widget_create_multistate_button(const view_context* view, int state_coun
 widget* widget_multistate_button_addstate(widget* wdgt, unsigned statenum, const char* image_name, action action) {
     if (wdgt->type == WIDGET_MULTISTATE_BUTTON && statenum <  wdgt->sub.multistate_button.state_count) {
         _btn_resource* res = wdgt->sub.multistate_button.res + statenum;
+        // cleanup
         if (res->resource_path) {
+            // already set up
+            if (0 == strcmp(res->resource_path, image_name)) {
+                return wdgt;
+            }
             free((void*)res->resource_path);
             res->resource_path = NULL;
         }
-        if (res->texture) {
-            SDL_DestroyTexture(res->texture);
-            res->texture = NULL;
+        if (res->texture_id) {
+            tcache_unlock_texture(res->texture_id);
+            res->texture_id = 0;
         }
         res->resource_path = strdup(image_name);
         res->action = action;
@@ -513,7 +546,7 @@ static _slider_workspace* slider_widget_init_workspace(widget* wdgt) {
         dummy_printf("pos       : %4d %4d %4d\n", wk->min_pos, wk->max_pos, wk->max_pos - wk->min_pos);
 
         {
-            _slider_resource* bar_start = wdgt->sub.slider.res[SLIDER_BAR_START].textures[0]? wdgt->sub.slider.res+SLIDER_BAR_START:NULL;
+            _slider_resource* bar_start = wdgt->sub.slider.res[SLIDER_BAR_START].texture_ids[0]? wdgt->sub.slider.res+SLIDER_BAR_START:NULL;
             SDL_Rect* r = &wk->bar_start_rect;
             if(bar_start) {
                 r->w = bar_start->w;
@@ -526,7 +559,7 @@ static _slider_workspace* slider_widget_init_workspace(widget* wdgt) {
             }
         }
         {
-            _slider_resource* bar_end = wdgt->sub.slider.res[SLIDER_BAR_END].textures[0]? wdgt->sub.slider.res+SLIDER_BAR_END:NULL;
+            _slider_resource* bar_end = wdgt->sub.slider.res[SLIDER_BAR_END].texture_ids[0]? wdgt->sub.slider.res+SLIDER_BAR_END:NULL;
             SDL_Rect* r = &wk->bar_end_rect;
             if(bar_end) {
                 r->w = bar_end->w;
@@ -538,7 +571,7 @@ static _slider_workspace* slider_widget_init_workspace(widget* wdgt) {
             }
         }
         {
-            _slider_resource* bar = wdgt->sub.slider.res[SLIDER_BAR].textures[0]? wdgt->sub.slider.res+SLIDER_BAR:NULL;
+            _slider_resource* bar = wdgt->sub.slider.res[SLIDER_BAR].texture_ids[0]? wdgt->sub.slider.res+SLIDER_BAR:NULL;
             SDL_Rect* r = &wk->bar_rect;
             if (bar) {
                 r->w = bar_w - 1;
@@ -581,39 +614,47 @@ static void slider_widget_render(widget* wdgt) {
     }
 
     {
-        _slider_resource* bar_start = wdgt->sub.slider.res[SLIDER_BAR_START].textures[0]? wdgt->sub.slider.res+SLIDER_BAR_START:NULL;
+        _slider_resource* bar_start = wdgt->sub.slider.res[SLIDER_BAR_START].texture_ids[0]? wdgt->sub.slider.res+SLIDER_BAR_START:NULL;
         if (bar_start) {
             int ix_texture = wk->current_pos > wk->min_pos? 1: 0;
-            SDL_RenderCopyEx(wdgt->view->app->renderer, bar_start->textures[ix_texture], NULL,
-                &wk->bar_start_rect, wdgt->view->app->orientation, NULL, flip);
+            SDL_RenderCopyEx(wdgt->view->app->renderer,
+                   tcache_quick_get_texture(bar_start->texture_ids[ix_texture]),
+                   NULL, &wk->bar_start_rect,
+                   wdgt->view->app->orientation, NULL, flip);
         }
     }
 
     {
-        _slider_resource* bar_end = wdgt->sub.slider.res[SLIDER_BAR_END].textures[0]? wdgt->sub.slider.res+SLIDER_BAR_END:NULL;
+        _slider_resource* bar_end = wdgt->sub.slider.res[SLIDER_BAR_END].texture_ids[0]? wdgt->sub.slider.res+SLIDER_BAR_END:NULL;
         if (bar_end) {
             int ix_texture = wk->current_pos < wk->max_pos? 0: 1;
-            SDL_RenderCopyEx(wdgt->view->app->renderer, bar_end->textures[ix_texture], NULL,
-                &wk->bar_end_rect, wdgt->view->app->orientation, NULL, flip);
+            SDL_RenderCopyEx(wdgt->view->app->renderer,
+                   tcache_quick_get_texture(bar_end->texture_ids[ix_texture]),
+                   NULL, &wk->bar_end_rect,
+                   wdgt->view->app->orientation, NULL, flip);
         }
     }
 
-    _slider_resource* bar = wdgt->sub.slider.res[SLIDER_BAR].textures[0]? wdgt->sub.slider.res+SLIDER_BAR:NULL;
+    _slider_resource* bar = wdgt->sub.slider.res[SLIDER_BAR].texture_ids[0]? wdgt->sub.slider.res+SLIDER_BAR:NULL;
     if (bar) {
         SDL_Rect image_rect;
         copyRect(&wk->bar_rect, &image_rect);
         image_rect.w = pick_rect.x - image_rect.x;
         translate_image_rect(&image_rect);
-        SDL_RenderCopyEx(wdgt->view->app->renderer, bar->textures[0], NULL,
-            &image_rect, wdgt->view->app->orientation, NULL, flip);
+        SDL_RenderCopyEx(wdgt->view->app->renderer,
+                tcache_quick_get_texture(bar->texture_ids[0]),
+                NULL, &image_rect,
+                wdgt->view->app->orientation, NULL, flip);
     }
 
     {
         SDL_Rect image_rect;
         copyRect( &pick_rect, &image_rect);
         translate_image_rect(&image_rect);
-        SDL_RenderCopyEx(wdgt->view->app->renderer, pick->textures[0], NULL,
-            &image_rect, wdgt->view->app->orientation, NULL, flip);
+        SDL_RenderCopyEx(wdgt->view->app->renderer,
+                tcache_quick_get_texture(pick->texture_ids[0]),
+                NULL, &image_rect,
+                wdgt->view->app->orientation, NULL, flip);
     }
 
     if (bar) {
@@ -622,8 +663,10 @@ static void slider_widget_render(widget* wdgt) {
         image_rect.w -= pick_rect.x + pick_rect.w - image_rect.x;
         image_rect.x = pick_rect.x + pick_rect.w;
         translate_image_rect(&image_rect);
-        SDL_RenderCopyEx(wdgt->view->app->renderer, bar->textures[1], NULL,
-            &image_rect, wdgt->view->app->orientation, NULL, flip);
+        SDL_RenderCopyEx(wdgt->view->app->renderer,
+                tcache_quick_get_texture(bar->texture_ids[1]),
+                NULL, &image_rect,
+                wdgt->view->app->orientation, NULL, flip);
     }
 
 }
