@@ -454,7 +454,7 @@ void app_cleanup(app_context* app_context, int exit_status) {
 void print_app_runtime_info(app_context* app_context) {
     SDL_RendererInfo info;
     if (0 == SDL_GetRendererInfo(app_context->renderer, &info)) {
-        debug_printf(
+        printf(
                 "Renderer info:\n"
                 "    name=%s\n"
                 "    max_texture_width=%d\n"
@@ -463,6 +463,8 @@ void print_app_runtime_info(app_context* app_context) {
                 info.max_texture_width,
                 info.max_texture_height
                );
+    } else {
+        printf("Failed to retrieve renderer information\n");
     }
     printf("display:%dx%d Orientation:%f, calibrated delay:%d millisseconds, maxiters:%u performance freq:%lu\n",
            app_context->screen_width,
