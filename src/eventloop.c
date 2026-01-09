@@ -12,6 +12,7 @@
 #include "visualizer.h"
 #include "logging.h"
 #include "timer.h"
+#include "texture_cache.h"
 
 #define HIDE_CURSOR_COUNT  300
 #define IMAGE_FLAGS IMG_INIT_PNG
@@ -78,6 +79,13 @@ void sdl_eventloop(view_context* view) {
                     loop = false;
                     break;
                 case SDL_SCANCODE_SPACE:
+                    {
+                        int m = tcache_get_texture_bytes_count();
+                        printf("\n %d %fMiB\n", m, (float)m/(1024*1024));
+                    }
+                    break;
+                case SDL_SCANCODE_T:
+                    tcache_dump();
                     break;
                 default:
                     break;

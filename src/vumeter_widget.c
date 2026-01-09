@@ -148,7 +148,8 @@ widget *widget_create_vumeter(const view_context* view) {
 
 static void free_vumeter_widget_prop(vumeter_widget* vw, vumeter_properties* props) {
     if (props) {
-        VUMeter_unload_media(props);
+        // let texture cache handle release of textures on demand
+        //VUMeter_unload_media(props);
         for (int iix=0; iix<vw->num_meters; ++iix) {
             if (props == vw->meters[iix].props) {
                 vw->meters[iix].props = NULL;
@@ -183,7 +184,8 @@ static bool vumeter_select(widget *wdgt, int indx) {
     vw->meter_indx = indx;
     if (props != vw->meters[vw->meter_indx].props)
     {
-        VUMeter_unload_media(props);
+        // let texture cache handle release of textures on demand
+        //VUMeter_unload_media(props);
         props = vw->meters[vw->meter_indx].props;
         if (!VUMeter_load_media(wdgt->view->app->renderer, props)) {
             exit(EXIT_FAILURE);

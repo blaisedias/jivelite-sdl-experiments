@@ -7,6 +7,7 @@
 #ifndef _VUMETERDEF_H_
 #define _VUMETERDEF_H_
 #include <SDL2/SDL.h>
+#include "texture_cache.h"
 
 typedef struct {
 //    const char* image;
@@ -76,13 +77,12 @@ typedef struct vu_props {
     struct {
         const int count;
         const char** names;
-        SDL_Texture** textures;
+        texture_id_t* textures;
     }resources;
     struct {
         const int count;
         vumeter_element* elements;
     }placements;
-    void (*fn_release)(struct vu_props*);
     float rotation;
     void * handle;
 }vumeter_properties;
