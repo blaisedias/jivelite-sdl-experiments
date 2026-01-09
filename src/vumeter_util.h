@@ -24,11 +24,13 @@ void VUMeter_dump_props(const vumeter_properties* vu);
 
 void VUMeter_diag();
 
-void set_perf_level(int);
-
-int calibrate(SDL_Renderer* renderer);
+void VUMeter_set_perf_level(int);
 
 bool VUMeter_loadlib(const char* path);
 const vumeter_properties* VUMeter_get_props_list();
+
+void VUMeter_set_peak_hold(int peak_hold);
+void VUMeter_set_decay_hold(int decay_hold);
+
 #endif
 

@@ -19,9 +19,18 @@ static int peak_hold_counter_init_value = 30;
 static int decay_hold_counter_init_value = 0;
 
 static int perf_level;
-void set_perf_level(int l) {
+void VUMeter_set_perf_level(int l) {
     perf_level = l;
 }
+
+void VUMeter_set_peak_hold(int peak_hold) {
+    peak_hold_counter_init_value = peak_hold;
+}
+
+void VUMeter_set_decay_hold(int decay_hold) {
+    decay_hold_counter_init_value = decay_hold;
+}
+
 
 static void center_vu_element(SDL_Rect* outer, SDL_Rect* inner, SDL_Rect* dst, float orientation) {
     int dx = (outer->w - inner->w)/2;

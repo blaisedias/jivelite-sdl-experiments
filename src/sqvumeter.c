@@ -42,12 +42,15 @@ const char* help_text=""
 " - wxh <width> <height> : window width and height, only works if window manager is avialable\n"
 " - fullscreen\n"
 "\n"
-" - json path to json file"
+" - json path to json file\n"
 "\n"
-" - vu <vumeter_name> first VU meter to display"
+" - vu <vumeter_name> first VU meter to display\n"
 "\n"
-" - showrects       : show widget draw rectangles when pointer is over them"
-" - showinputrects  : show widget input rectangles when pointer is over them"
+" - showrects       : show widget draw rectangles when pointer is over them\n"
+" - showinputrects  : show widget input rectangles when pointer is over them\n"
+"\n"
+" - peakhold <count>: number of frames for VU peak hold\n"
+" - decayhold <count>: number of frames for VU decay hold - reduces needle jitter\n"
 "\n";  
 
 const char* json_file="./npvu.json";
@@ -140,7 +143,7 @@ int main(int argc, char **argv) {
             show_input_rects = true;
         } else if (0 == strcmp(argv[i], "perf_level")) {
             if (argc > i+1) {
-                set_perf_level(atoi(argv[i+1]));
+                VUMeter_set_perf_level(atoi(argv[i+1]));
                 i += 1;
             }
          } else if (0 == strcmp(argv[i], "vu")) {
@@ -172,6 +175,16 @@ int main(int argc, char **argv) {
         } else if (0 == strcmp(argv[i], "help") || 0 == strcmp(argv[i], "-h") || 0 == strcmp(argv[i], "--h")) {
             puts(help_text);
             exit(EXIT_SUCCESS);
+        } else if (0 == strcmp(argv[i], "peakhold")) {
+            if (argc > i+1) {
+                VUMeter_set_peak_hold(atoi(argv[i+1]));
+                i += 1;
+            }
+        } else if (0 == strcmp(argv[i], "decayhold")) {
+            if (argc > i+1) {
+                VUMeter_set_decay_hold(atoi(argv[i+1]));
+                i += 1;
+            }
         } else {
             error_printf("Unknown command line option %d) %s\n", i, argv[i]);
             exit(EXIT_FAILURE);
