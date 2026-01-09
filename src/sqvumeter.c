@@ -61,7 +61,8 @@ struct App {
     const Uint8 *keystate;
 };
 
-extern void sdl_eventloop(view_context* view);
+extern void sdl_render_loop(view_context* view);
+extern void sdl_input_loop(view_context* view);
 extern bool app_initialize(app_context*, const char* window_title);
 extern void app_cleanup(app_context* app, int exit_status);
 extern void print_app_runtime_info(app_context* app_context);
@@ -242,8 +243,9 @@ int main(int argc, char **argv) {
     }
 
     print_app_runtime_info(&app.context);
-
-    sdl_eventloop(&view);
+    SDL_Thread* input_thread = SDL_CreateThread((SDL_ThreadFunction)sdl_input_loop, "input", &view);
+    sdl_render_loop(&view);
+    SDL_WaitThread(input_thread, NULL);
 
     app_cleanup(&app.context, EXIT_SUCCESS);
 

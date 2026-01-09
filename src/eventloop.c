@@ -18,21 +18,21 @@
 #define IMAGE_FLAGS IMG_INIT_PNG
 
 static SDL_RendererFlags render_flags = SDL_RENDERER_ACCELERATED;
+static int hide_cursor_count = 0;
+static bool input_loop = true;
+static bool render_loop = true;
 
-void sdl_eventloop(view_context* view) {
+void sdl_render_loop(view_context* view) {
     const app_context* app_context = view->app;
     SDL_RenderClear(app_context->renderer);
     int vols[2] = {0, 0};
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
-    bool ignore_SDL_FINGER = 0 == start_touch_screen_event_generator(NULL);
     SDL_ShowCursor(SDL_DISABLE);
-    int hide_cursor_count = 0;
     uint64_t pfreq_micro_s = SDL_GetPerformanceFrequency();
     pfreq_micro_s /= 1000000;
     Uint32 iters = 0;
-    bool loop = true;
 
-    while (loop) {
+    while (render_loop) {
         uint64_t ms_0 = getMicros();
         uint64_t pc_0 = SDL_GetPerformanceCounter();
         if (hide_cursor_count) {
@@ -44,123 +44,6 @@ void sdl_eventloop(view_context* view) {
                         widget->focussed = false;
                         widget->highlight = false;
                     }
-            }
-        }
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            switch (event.type) {
-            case USEREVENT_NEXT_VISU:
-            case USEREVENT_NEXT_VU:
-                {
-                    for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
-                        if (t->type == WIDGET_VUMETER) {
-                            widget_vumeter_select_next(t);
-                        }
-                    }
-                }break;
-            case USEREVENT_PREV_VISU:
-            case USEREVENT_PREV_VU:
-                {
-                    for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
-                        if (t->type == WIDGET_VUMETER) {
-                            widget_vumeter_select_prev(t);
-                        }
-                    }
-                }break;
-            case SDL_QUIT:
-                puts("");
-                loop = false;
-//                app_cleanup(&app, EXIT_->UCCESS);
-                break;
-            case SDL_KEYDOWN:
-                switch (event.key.keysym.scancode) {
-                case SDL_SCANCODE_ESCAPE: 
-                    puts("");
-                    loop = false;
-                    break;
-                case SDL_SCANCODE_SPACE:
-                    {
-                        int m = tcache_get_texture_bytes_count();
-                        printf("\n %d %fMiB\n", m, (float)m/(1024*1024));
-                    }
-                    break;
-                case SDL_SCANCODE_T:
-                    tcache_dump();
-                    break;
-                default:
-                    break;
-                }
-            case SDL_MOUSEMOTION:
-                {
-                    SDL_ShowCursor(SDL_ENABLE);
-                    hide_cursor_count = HIDE_CURSOR_COUNT;
-                    SDL_Point pt = {.x=event.button.x, .y=event.button.y};
-                    widget_list_react(view->list, POINTER_MOTION, &pt);
-                } break;
-            case SDL_MOUSEBUTTONDOWN:
-                {
-                    SDL_ShowCursor(SDL_ENABLE);
-                    hide_cursor_count = HIDE_CURSOR_COUNT;
-                    SDL_Point pt = {.x=event.button.x, .y=event.button.y};
-                    widget_list_react(view->list, POINTER_DOWN, &pt);
-                } break;
-            case SDL_MOUSEBUTTONUP:
-                {
-                    SDL_ShowCursor(SDL_ENABLE);
-                    hide_cursor_count = HIDE_CURSOR_COUNT;
-                    SDL_Point pt = {.x=event.button.x, .y=event.button.y};
-                    widget_list_react(view->list, POINTER_UP, &pt);
-                } break;
-            case SDL_FINGERMOTION:
-                if (ignore_SDL_FINGER) {
-                    input_printf("IGNORING SFMO: %04d, %04d\n",(int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
-                } else {
-                    SDL_Point pt = { 
-                        .x = (int)(event.tfinger.x*app_context->screen_width),
-                        .y = (int)(event.tfinger.y*app_context->screen_height)
-                    };
-                    widget_list_react(view->list, POINTER_MOTION, &pt);
-                }
-                break;
-            case USEREVENT_FINGERMOTION:
-                {
-                    SDL_Point pt = { .x = event.motion.x, .y = event.motion.y };
-                    widget_list_react(view->list, POINTER_MOTION, &pt);
-                } break;
-            case SDL_FINGERDOWN:
-                if (ignore_SDL_FINGER) {
-                    input_printf("IGNORING SFDN: %04d, %04d\n", (int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
-                } else {
-                    SDL_Point pt = { 
-                        .x = (int)(event.tfinger.x*app_context->screen_width),
-                        .y = (int)(event.tfinger.y*app_context->screen_height)
-                    };
-                    widget_list_react(view->list, POINTER_DOWN, &pt);
-                }
-                break;
-            case USEREVENT_FINGERDOWN:
-                {
-                    SDL_Point pt = { .x = event.motion.x, .y = event.motion.y };
-                    widget_list_react(view->list, POINTER_DOWN, &pt);
-                } break;
-            case SDL_FINGERUP:
-                if (ignore_SDL_FINGER) {
-                    input_printf("IGNORING SFUP: %04d, %04d\n", (int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
-                } else {
-                    SDL_Point pt = { 
-                        .x = (int)(event.tfinger.x*app_context->screen_width),
-                        .y = (int)(event.tfinger.y*app_context->screen_height)
-                    };
-                    widget_list_react(view->list, POINTER_UP, &pt);
-                }
-                break;
-            case USEREVENT_FINGERUP:
-                {
-                    SDL_Point pt = { .x = event.motion.x, .y = event.motion.y };
-                    widget_list_react(view->list, POINTER_UP, &pt);
-                } break;
-            default:
-                break;
             }
         }
 
@@ -205,7 +88,6 @@ void sdl_eventloop(view_context* view) {
             }
         }
     }
-    stop_touch_screen_event_generator();
 }
 
 #if 1
@@ -473,4 +355,135 @@ void print_app_runtime_info(app_context* app_context) {
            app_context->delay, 
            app_context->max_iters,
            SDL_GetPerformanceFrequency());
+}
+
+void sdl_input_loop(view_context* view) {
+    const app_context* app_context = view->app;
+    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
+    bool ignore_SDL_FINGER = 0 == start_touch_screen_event_generator(NULL);
+    SDL_ShowCursor(SDL_DISABLE);
+
+    while (input_loop) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            switch (event.type) {
+            case USEREVENT_NEXT_VISU:
+            case USEREVENT_NEXT_VU:
+                {
+                    for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
+                        if (t->type == WIDGET_VUMETER) {
+                            widget_vumeter_select_next(t);
+                        }
+                    }
+                }break;
+            case USEREVENT_PREV_VISU:
+            case USEREVENT_PREV_VU:
+                {
+                    for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
+                        if (t->type == WIDGET_VUMETER) {
+                            widget_vumeter_select_prev(t);
+                        }
+                    }
+                }break;
+            case SDL_QUIT:
+                puts("");
+                render_loop = false;
+                input_loop = false;
+//                app_cleanup(&app, EXIT_->UCCESS);
+                break;
+            case SDL_KEYDOWN:
+                switch (event.key.keysym.scancode) {
+                case SDL_SCANCODE_ESCAPE: 
+                    puts("");
+                    render_loop = false;
+                    input_loop = false;
+                    break;
+                case SDL_SCANCODE_SPACE:
+                    {
+                        int m = tcache_get_texture_bytes_count();
+                        printf("\n %d %fMiB\n", m, (float)m/(1024*1024));
+                    }
+                    break;
+                case SDL_SCANCODE_T:
+                    tcache_dump();
+                    break;
+                default:
+                    break;
+                }
+            case SDL_MOUSEMOTION:
+                {
+                    SDL_ShowCursor(SDL_ENABLE);
+                    hide_cursor_count = HIDE_CURSOR_COUNT;
+                    SDL_Point pt = {.x=event.button.x, .y=event.button.y};
+                    widget_list_react(view->list, POINTER_MOTION, &pt);
+                } break;
+            case SDL_MOUSEBUTTONDOWN:
+                {
+                    SDL_ShowCursor(SDL_ENABLE);
+                    hide_cursor_count = HIDE_CURSOR_COUNT;
+                    SDL_Point pt = {.x=event.button.x, .y=event.button.y};
+                    widget_list_react(view->list, POINTER_DOWN, &pt);
+                } break;
+            case SDL_MOUSEBUTTONUP:
+                {
+                    SDL_ShowCursor(SDL_ENABLE);
+                    hide_cursor_count = HIDE_CURSOR_COUNT;
+                    SDL_Point pt = {.x=event.button.x, .y=event.button.y};
+                    widget_list_react(view->list, POINTER_UP, &pt);
+                } break;
+            case SDL_FINGERMOTION:
+                if (ignore_SDL_FINGER) {
+                    input_printf("IGNORING SFMO: %04d, %04d\n",(int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
+                } else {
+                    SDL_Point pt = { 
+                        .x = (int)(event.tfinger.x*app_context->screen_width),
+                        .y = (int)(event.tfinger.y*app_context->screen_height)
+                    };
+                    widget_list_react(view->list, POINTER_MOTION, &pt);
+                }
+                break;
+            case USEREVENT_FINGERMOTION:
+                {
+                    SDL_Point pt = { .x = event.motion.x, .y = event.motion.y };
+                    widget_list_react(view->list, POINTER_MOTION, &pt);
+                } break;
+            case SDL_FINGERDOWN:
+                if (ignore_SDL_FINGER) {
+                    input_printf("IGNORING SFDN: %04d, %04d\n", (int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
+                } else {
+                    SDL_Point pt = { 
+                        .x = (int)(event.tfinger.x*app_context->screen_width),
+                        .y = (int)(event.tfinger.y*app_context->screen_height)
+                    };
+                    widget_list_react(view->list, POINTER_DOWN, &pt);
+                }
+                break;
+            case USEREVENT_FINGERDOWN:
+                {
+                    SDL_Point pt = { .x = event.motion.x, .y = event.motion.y };
+                    widget_list_react(view->list, POINTER_DOWN, &pt);
+                } break;
+            case SDL_FINGERUP:
+                if (ignore_SDL_FINGER) {
+                    input_printf("IGNORING SFUP: %04d, %04d\n", (int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
+                } else {
+                    SDL_Point pt = { 
+                        .x = (int)(event.tfinger.x*app_context->screen_width),
+                        .y = (int)(event.tfinger.y*app_context->screen_height)
+                    };
+                    widget_list_react(view->list, POINTER_UP, &pt);
+                }
+                break;
+            case USEREVENT_FINGERUP:
+                {
+                    SDL_Point pt = { .x = event.motion.x, .y = event.motion.y };
+                    widget_list_react(view->list, POINTER_UP, &pt);
+                } break;
+            default:
+                break;
+            }
+        }
+        SDL_Delay(100);
+    }
+    stop_touch_screen_event_generator();
 }
