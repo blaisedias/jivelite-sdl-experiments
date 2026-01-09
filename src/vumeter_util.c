@@ -12,21 +12,15 @@
 #include "visualizer.h"
 #include "util.h"
 
-int peak_hold_counter_init_value = 30;
+// @60 FPS 30 => 1/2 a second
+static int peak_hold_counter_init_value = 30;
 // fine tune decay behaviour - default is 0 so decay immediately
 // @60 FPS 4 appears to be a reasonable value.
-int decay_hold_counter_init_value = 0;
+static int decay_hold_counter_init_value = 0;
 
 static int perf_level;
 void set_perf_level(int l) {
     perf_level = l;
-}
-
-void rebaseRect(SDL_Rect* origin, SDL_Rect* src, SDL_Rect* dst) {
-    dst->x = origin->x +src->x;
-    dst->y = origin->y + src->y;
-    dst->w = src->w;
-    dst->h = src->h;
 }
 
 static void center_vu_element(SDL_Rect* outer, SDL_Rect* inner, SDL_Rect* dst, float orientation) {

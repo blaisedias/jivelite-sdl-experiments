@@ -26,4 +26,6 @@ extern const void (*translate_point)(SDL_Point* pt);
 extern const void (*translate_image_rect)(SDL_Rect* rect);
 extern const void (*translate_draw_rect)(SDL_Rect* rect);
 extern void setup_orientation(float orientation, int w, int h, SDL_Rect* screen);
+
+void rebaseRect(SDL_Rect* origin, SDL_Rect* src, SDL_Rect* dst);
 #endif
