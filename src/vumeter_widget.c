@@ -121,7 +121,11 @@ static void vumeter_render(widget* wdgt) {
     vumeter_widget* vw = wdgt->sub.vu;
     int vols[2];
     visualizer_vumeter(vols);
-    VUMeter_draw(wdgt->view->app->renderer,vw->meters[vw->meter_indx].props,vw->meters[vw->meter_indx].meter, vols, &draw_rect);
+    VUMeter_draw(wdgt->view->app->renderer,
+        vw->meters[vw->meter_indx].props, 
+        vw->meters[vw->meter_indx].meter,
+        vols, &draw_rect
+    );
 }
 
 widget *widget_create_vumeter(const view_context* view) {
@@ -180,6 +184,7 @@ static bool vumeter_select(widget *wdgt, int indx) {
         return false;
     }
     perf_printf("\n");
+    printf("vumeter_select %d current is %d\n", indx, vw->meter_indx); fflush(stdout);
     if (indx != vw->meter_indx)
     {
         // let texture cache handle release of textures on demand
@@ -190,6 +195,7 @@ static bool vumeter_select(widget *wdgt, int indx) {
         }
     }
     vw->meter_indx = indx;
+    printf("vumeter: %s\n", vw->meters[vw->meter_indx].meter->name); fflush(stdout);
     debug_printf("vumeter: %s\n", vw->meters[vw->meter_indx].meter->name);
     return true;
 }
