@@ -179,18 +179,17 @@ static bool vumeter_select(widget *wdgt, int indx) {
     if (indx < 0 || indx >= vw->num_meters) {
         return false;
     }
-    vumeter_properties* props = vw->meters[vw->meter_indx].props;
     perf_printf("\n");
-    vw->meter_indx = indx;
-    if (props != vw->meters[vw->meter_indx].props)
+    if (indx != vw->meter_indx)
     {
         // let texture cache handle release of textures on demand
-        //VUMeter_unload_media(props);
-        props = vw->meters[vw->meter_indx].props;
+        //VUMeter_unload_media(vw->meters[vw->meter_indx].props);
+        vumeter_properties* props = vw->meters[indx].props;
         if (!VUMeter_load_media(wdgt->view->app->renderer, props)) {
             exit(EXIT_FAILURE);
         }
     }
+    vw->meter_indx = indx;
     debug_printf("vumeter: %s\n", vw->meters[vw->meter_indx].meter->name);
     return true;
 }
