@@ -137,7 +137,7 @@ widget* widget_load_media(widget* wdgt, const char* resource_path) {
                     wdgt->sub.image.texture_id = tcache_load_media(wdgt->image_path, wdgt->view->app->renderer, &loaded);
                     if (loaded) {
                         tcache_lock_texture(wdgt->sub.image.texture_id);
-                        if (0 == SDL_QueryTexture(tcache_quick_get_texture(wdgt->sub.image.texture_id), NULL, NULL, &wdgt->sub.image.w, &wdgt->sub.image.h)) {
+                        if (tcache_quick_get_texture_dimensions(wdgt->sub.image.texture_id, &wdgt->sub.image.w, &wdgt->sub.image.h)) {
                             setup_image_fit_src_rect(wdgt);
                         }
                     } else {

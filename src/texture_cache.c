@@ -24,6 +24,7 @@ struct tcache_entry {
     const char*         path;
     uint32_t            hashv;
     const SDL_Texture*  texture;
+    SDL_Surface*        surface;
     int                 w,h;
     int                 num_bytes;
     bool                ejected;
@@ -84,7 +85,6 @@ static void release_texture(tcache_entry* tce) {
 }
 
 static void update_texture(tcache_entry* tce, const SDL_Texture* texture) {
-    tcache_init();
     if (tce) {
         if (tce->texture) {
             release_texture(tce);
@@ -113,6 +113,7 @@ texture_id_t tcache_put_texture(const char* path, const SDL_Texture* texture) {
     texture_id_t indx = hashv%HASHTPRIME;
     int hop_count = 0;
 
+    tcache_init();
     for(int count=0; count < HASHTPRIME; ++count) {
         tcache_entry* tce = tbl[indx];
         // indx 0 -> reserved for uninitialised 
@@ -327,13 +328,18 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
     if (tce) {
         // Only load if not previously loaded
         if (tce->texture == NULL) {
-            update_texture(tce, IMG_LoadTexture(renderer, tce->path));
-            if (NULL == tce->texture) {
-                error_printf("tcache_load_from_file: failed: %d %s\n", texture_id, tce->path);
-            }
+           if (tce->surface == NULL) {
+                tce->surface = IMG_Load(tce->path);
+                if (tce->surface == NULL)  {
+                    error_printf("tcache_load_from_file: failed: %d %s\n", texture_id, tce->path);
+                } else {
+                    tce->w = tce->surface->w;
+                    tce->h = tce->surface->h;
+                }
+           }
         }
         recently_used(tce);
-        return tce->texture != NULL;
+        return tce->texture != NULL || tce->surface !=NULL; 
     }
     error_printf("tcache_load_from_file: none: %d\n", texture_id);
     return false;
@@ -523,3 +529,40 @@ texture_id_t tcache_get_texture_id(const char* token) {
     }
     return INVALID_TEXTURE_ID;
 }
+
+void tcache_resolve_textures(SDL_Renderer* renderer) {
+    tcache_init();
+    for(texture_id_t ix=0; ix < HASHTPRIME; ++ix) {
+        tcache_entry* tce = tbl[ix];
+        if (tce && tce->texture==NULL && tce->surface !=NULL) {
+            SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, tce->surface);
+            if (NULL == texture) {
+                error_printf("tcache_resolve_textures: failed: %s %s\n", ix, tce->path, SDL_GetError());
+                SDL_ClearError();
+            }
+            update_texture(tce, texture);
+            SDL_FreeSurface(tce->surface);
+            tce->surface = NULL;
+        }
+    }
+}
+
+// Get texture width and height 
+// texture_id*: quick access texture ID
+// returns: true if the texture dimensions could be determined
+bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h) {
+    if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
+        error_printf("tcache_quick_get_texture_ejected: invalid id %d\n", texture_id);
+        exit(EXIT_FAILURE);
+    }
+    tcache_entry* tce = tbl[texture_id];
+    if (tce) {
+        if (tce->texture || tce->surface) {
+            *w = tce->w;
+            *h = tce->h;
+        }
+        return true;
+    }
+    return false;
+}
+

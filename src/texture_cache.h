@@ -22,4 +22,9 @@ texture_id_t tcache_get_empty_tid(void);
 bool tcache_lock_texture(texture_id_t texture_id);
 bool tcache_unlock_texture(texture_id_t texture_id);
 texture_id_t tcache_get_texture_id(const char* token);
+
+// Must be called in the thread that created the renderer
+void tcache_resolve_textures(SDL_Renderer* renderer);
+
+bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h);
 #endif

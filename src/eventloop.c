@@ -33,6 +33,7 @@ void sdl_render_loop(view_context* view) {
     Uint32 iters = 0;
 
     while (render_loop) {
+        tcache_resolve_textures(app_context->renderer);
         uint64_t ms_0 = getMicros();
         uint64_t pc_0 = SDL_GetPerformanceCounter();
         if (hide_cursor_count) {
