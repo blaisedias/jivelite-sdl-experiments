@@ -79,7 +79,8 @@ void sdl_render_loop(view_context* view) {
             SDL_Delay(app_context->delay);
         }
         if (iters >= app_context->max_iters) {
-            break;
+            render_loop = false;
+            input_loop = false;
         }
         if (iters % app_context->cycle_iters == 0) {
             for(widget* t = view->list->head.next; t != NULL; t = t->next) {
