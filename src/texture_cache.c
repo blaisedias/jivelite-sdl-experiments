@@ -15,6 +15,7 @@
 #include "texture_cache.h"
 #include "types.h"
 #include "logging.h"
+#include "timer.h"
 
 typedef struct tcache_entry tcache_entry;
 
@@ -37,6 +38,8 @@ static tcache_entry empty_tce = {
 
 int64_t global_inuse_counter = 1;
 uint64_t num_texture_bytes = 0;
+uint32_t resolution_req_counter;
+uint32_t resolution_done_counter;
 
 #define PRIME2K 2039
 #define PRIME4k 4093
@@ -335,6 +338,8 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
                 } else {
                     tce->w = tce->surface->w;
                     tce->h = tce->surface->h;
+                    // signal texture resultion required
+                    ++resolution_req_counter;
                 }
            }
         }
@@ -532,6 +537,21 @@ texture_id_t tcache_get_texture_id(const char* token) {
 
 void tcache_resolve_textures(SDL_Renderer* renderer) {
     tcache_init();
+    // signalling between threads.
+    // synchronisation primitives could be used but this is simpler and lockless.
+    // When an image is loaded into a surface the request counter is incremented
+    // When resolution is performed the done counter is synchronised with the req counter
+    // since *all* resolutions are perfromed.
+    if (resolution_req_counter == resolution_done_counter) {
+        return;
+    }
+    // Resolution is required:
+    // BEFORE resolving synchronise the request and donecounter values,
+    // then if during resolution an image is loaded in another thread the counters will
+    // not be equal the next time tcache_resolve_textures is invoked and resolution will occur.
+    // An extra resolution scan may be performed, that is deemed an acceptable trade-off.
+    uint64_t ms_0 = getMicros();
+    resolution_done_counter = resolution_req_counter;
     for(texture_id_t ix=0; ix < HASHTPRIME; ++ix) {
         tcache_entry* tce = tbl[ix];
         if (tce && tce->texture==NULL && tce->surface !=NULL) {
@@ -545,6 +565,8 @@ void tcache_resolve_textures(SDL_Renderer* renderer) {
             tce->surface = NULL;
         }
     }
+    uint64_t ms_1 = getMicros();
+    perf_printf("\ntexture_resolve: %lu, %lu ms\n",ms_1 - ms_0, (ms_1 - ms_0)/1000);
 }
 
 // Get texture width and height 
