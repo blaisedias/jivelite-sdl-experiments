@@ -79,6 +79,7 @@ void sdl_render_loop(view_context* view) {
             SDL_Delay(app_context->delay);
         }
         if (iters >= app_context->max_iters) {
+            debug_printf("*** iters=%d == max_iters%d ****\n");
             render_loop = false;
             input_loop = false;
         }
@@ -90,6 +91,7 @@ void sdl_render_loop(view_context* view) {
             }
         }
     }
+    debug_printf("*** render loop end ****\n");
 }
 
 #if 1
@@ -488,4 +490,5 @@ void sdl_input_loop(view_context* view) {
         SDL_Delay(100);
     }
     stop_touch_screen_event_generator();
+    debug_printf("*** input loop end ****\n");
 }
