@@ -178,6 +178,16 @@ bool app_initialize(app_context* app_context, const char* window_title) {
         return true;
     }
 
+    int num_displays = SDL_GetNumVideoDisplays();
+    for (int i_display = 0; i_display < num_displays; ++ i_display) {
+            SDL_DisplayMode dm;
+            if (0 == SDL_GetCurrentDisplayMode(i_display, &dm)) {
+                printf("Display:%d fmt=%x, w=%d, h=%d, rate=%d\n",
+                        i_display,
+                        dm.format, dm.w, dm.h, dm.refresh_rate);
+            } 
+    }
+
     SDL_Window *window;
 
     sleep(1);
