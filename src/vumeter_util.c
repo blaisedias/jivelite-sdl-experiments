@@ -11,6 +11,7 @@
 #include "vumeter_util.h"
 #include "visualizer.h"
 #include "util.h"
+#include "timer.h"
 
 // @60 FPS 30 => 1/2 a second
 static int peak_hold_counter_init_value = 30;
@@ -116,7 +117,7 @@ void VUMeter_orientate(vumeter_properties *vu, float rotation, SDL_Rect* enclosu
 static char load_buffer[4096];
 SDL_bool VUMeter_load_media(SDL_Renderer *renderer, vumeter_properties *vu) {
     int indx;
-    Uint64 pc = SDL_GetPerformanceCounter();
+    uint64_t ms = getMillis();
     SDL_bool ok = SDL_TRUE;
     load_printf("load media: %p\n"
             "resources: count=%d names=%p textures=%p\n",
@@ -149,10 +150,10 @@ SDL_bool VUMeter_load_media(SDL_Renderer *renderer, vumeter_properties *vu) {
             ok = ok && tcache_load_from_file(vu->resources.textures[indx], renderer);
         }
     }
-    pc = SDL_GetPerformanceCounter() - pc;
-    perf_printf("load media %s time:%f milliseconds ok=%s\n",
+    ms = getMillis() - ms;
+    perf_printf("load media %s time:%lu milliseconds ok=%s\n",
                 vu->name,
-                (((float)pc/SDL_GetPerformanceFrequency()*1000)),
+                ms,
                 ok?"true":"false");
     return ok;
 }
@@ -341,13 +342,12 @@ vumeter_properties* VUMeter_scale(vumeter_properties* vu, int w_in, int h_in, fl
 }
 
 static SDL_RendererFlip flip = SDL_FLIP_NONE;
-static Uint32 sample_frame_count;
-static Uint64 frame_count;
-//static Uint64 perf_count;
-static Uint64 sample_perf_count;
-static Uint64 max_sample_perf_count;
-static Uint64 pc_1;
-static Uint64 pc_2;
+static uint64_t frame_count;
+static uint32_t sample_frame_count;
+static uint64_t acc_render_time;
+static uint64_t max_render_time;
+static uint64_t ms_1;
+static uint64_t ms_2;
 // to check and reset performance counters when vumeter is changed.
 static const vumeter* prev_vumeter;
 
@@ -357,16 +357,16 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
 
     if (perf_printf != dummy_printf) {
        if(prev_vumeter != vumeter) {
-            max_sample_perf_count = 0;
+            max_render_time = 0;
             sample_frame_count = 0;
             frame_count = 0;
-            sample_perf_count = 0;
-            pc_1 = SDL_GetPerformanceCounter();
+            acc_render_time = 0;
+            ms_1 = getMicros();
         }
         prev_vumeter = vumeter;
     }
 
-    Uint64 pc0 = SDL_GetPerformanceCounter();
+    uint64_t ms0 = getMicros();
 
     int i;
 
@@ -506,49 +506,33 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
     vol_printf("\r");
 
 #undef _RENDER_VOLUME_LEVEL_
-    Uint64 delta_pf = SDL_GetPerformanceCounter() - pc0;
-    sample_perf_count += delta_pf;
+    uint64_t delta_pf = getMicros() - ms0;
+    acc_render_time += delta_pf;
 
-    if (delta_pf > max_sample_perf_count) {
-        max_sample_perf_count =  delta_pf;
-//        printf("%ld\n", max_sample_perf_count);
+    if (delta_pf > max_render_time) {
+        max_render_time =  delta_pf;
+//        printf("%ld\n", max_render_time);
     }
     ++sample_frame_count;
     ++frame_count;
     if (sample_frame_count >= 100) {
-        pc_2 = SDL_GetPerformanceCounter();
-        float fps = ((float)SDL_GetPerformanceFrequency()/(pc_2-pc_1)) * sample_frame_count;
+        ms_2 = getMicros();
+        float fps = 1000000.0 * sample_frame_count/(ms_2-ms_1);
         switch(perf_level) {
             case 3:
-                perf_printf("\rFPS:%04.1f frame_count:%03d total_pfc:%08lu pfc/frame:%08lu pf/frame ms:%08.3f max_sample_perf:count:%08lu ms:%08.3f %lu",
-                    fps, sample_frame_count,
-                    sample_perf_count, sample_perf_count/sample_frame_count, (((float)sample_perf_count/SDL_GetPerformanceFrequency())*1000)/sample_frame_count,
-                    max_sample_perf_count,
-                    (((float)max_sample_perf_count/SDL_GetPerformanceFrequency())*1000),
-                    frame_count
-                );
-                break;
             case 2:
-                perf_printf("\rFPS:%04.1f frames:%03d pfc:frame:count:%08lu ms:%08.3f, max:count:%08lu ms:%08.3f %lu",
-                        fps, sample_frame_count,
-                        sample_perf_count/sample_frame_count, (((float)sample_perf_count/SDL_GetPerformanceFrequency())*1000)/sample_frame_count,
-                        max_sample_perf_count,
-                        (((float)max_sample_perf_count/SDL_GetPerformanceFrequency())*1000),
-                        frame_count
-                    );
-                break;
             default:
-                perf_printf("\rFPS:%05.2f frame:millis: avg:%5.2f, max:%05.2f %lu %lu",
+                perf_printf("\rFPS:%05.2f frame:millis: avg:%5.2f, max:%05.2f sample: millis:%5.2f, frames:%d",
                         fps,
-                        (((float)sample_perf_count/SDL_GetPerformanceFrequency())*1000)/sample_frame_count,
-                        (((float)max_sample_perf_count/SDL_GetPerformanceFrequency())*1000),
-                        frame_count, pc_2 - pc_1
+                        ((float)acc_render_time/sample_frame_count)/1000,
+                        (float)max_render_time/1000,
+                        (float)(ms_2 - ms_1)/1000, sample_frame_count
                     );
         }
         sample_frame_count = 0;
-        sample_perf_count = 0;
-        pc_1 = pc_2;
-//        max_sample_perf_count = 0;
+        acc_render_time = 0;
+        ms_1 = ms_2;
+//        max_render_time = 0;
     }
 }
 
