@@ -11,7 +11,7 @@
 #include "touch_screen_sdl2.h"
 #include "visualizer.h"
 #include "logging.h"
-#include "timer.h"
+#include "timing.h"
 #include "texture_cache.h"
 
 #define HIDE_CURSOR_COUNT  300
@@ -34,7 +34,7 @@ void sdl_render_loop(view_context* view) {
 
     while (render_loop) {
         tcache_resolve_textures(app_context->renderer);
-        uint64_t ms_0 = getMicros();
+        uint64_t ms_0 = get_micro_seconds();
         uint64_t pc_0 = SDL_GetPerformanceCounter();
         if (hide_cursor_count) {
             if (0 >= --hide_cursor_count) {
@@ -50,11 +50,11 @@ void sdl_render_loop(view_context* view) {
 
         visualizer_vumeter(vols);
         Uint64 pc_1 = SDL_GetPerformanceCounter();
-        uint64_t ms_1 = getMicros();
+        uint64_t ms_1 = get_micro_seconds();
         SDL_RenderClear(app_context->renderer);
 
         Uint64 pc_2 = SDL_GetPerformanceCounter();
-        uint64_t ms_2 = getMicros();
+        uint64_t ms_2 = get_micro_seconds();
 
         for(widget* widget=view->list->head.next; widget != NULL; widget=widget->next) {
             if (!widget->hidden) {
@@ -64,7 +64,7 @@ void sdl_render_loop(view_context* view) {
 
         SDL_RenderPresent(app_context->renderer);
         Uint64 pc_3 = SDL_GetPerformanceCounter();
-        uint64_t ms_3 = getMicros();
+        uint64_t ms_3 = get_micro_seconds();
         frame_perf_printf("\r%05.2f ms, %05.2f ms  %lu %lu %lu %lu %lu %lu                     ",
                (1000.0 *(pc_2-pc_1))/SDL_GetPerformanceFrequency(),
                (1000.0 *(pc_3-pc_1))/SDL_GetPerformanceFrequency(),
@@ -111,7 +111,7 @@ static int calibrate_delay(app_context* app_context) {
     float rotation = 0.0;    
     SDL_RenderClear(app_context->renderer);
     SDL_RenderPresent(app_context->renderer);
-    uint64_t micros = getMicros();
+    uint64_t micros = get_micro_seconds();
     for (int i = 0; i < CALIBRATION_FRAME_COUNT; ++i) {
         SDL_RenderClear(app_context->renderer);
         SDL_RenderCopyEx(app_context->renderer, texture, &src_rect,
@@ -120,7 +120,7 @@ static int calibrate_delay(app_context* app_context) {
         rotation += 1;
     }
     // milliseconds for 1000 frames
-    micros = getMicros() - micros;
+    micros = get_micro_seconds() - micros;
     // avg milliseconds per frame
     micros /= CALIBRATION_FRAME_COUNT;
     printf("Calibration for vsync: milliSeconds/frame=%f fps=%f\n",

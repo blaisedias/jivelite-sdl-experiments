@@ -6,7 +6,7 @@
 #include <time.h>
 
 
-uint64_t getMicros() {
+uint64_t get_micro_seconds() {
     uint64_t millis;
     struct timespec  ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
@@ -18,7 +18,7 @@ uint64_t getMicros() {
     return millis;
 }
 
-uint64_t getMillis() {
-    return getMicros()/1000;
+uint64_t get_milli_seconds() {
+    return get_micro_seconds()/1000;
 }
 

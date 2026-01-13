@@ -66,7 +66,7 @@ SQVUMETER_OBJS = \
    		  $(OBJS_DIR)/city.o $(OBJS_DIR)/texture_cache.o \
 		  $(OBJS_DIR)/touch_screen.o \
 		  $(OBJS_DIR)/touch_screen_sdl2.o \
-   		  $(OBJS_DIR)/timer.o
+   		  $(OBJS_DIR)/timing.o
 
 all: $(BIN_DIR)/sqvumeter $(SHARED_OBJS) \
 	$(BIN_DIR)/test_tcache \
@@ -130,7 +130,7 @@ $(LIB_DIR)/%.so: $(OBJS_DIR)/%.o | $(LIB_DIR)
 
 # test executables
 # 1. texture cache
-$(BIN_DIR)/test_tcache : $(OBJS_DIR)/test_tcache.o $(OBJS_DIR)/texture_cache.o $(OBJS_DIR)/logging.o $(OBJS_DIR)/city.o $(OBJS_DIR)/timer.o | $(BIN_DIR)
+$(BIN_DIR)/test_tcache : $(OBJS_DIR)/test_tcache.o $(OBJS_DIR)/texture_cache.o $(OBJS_DIR)/logging.o $(OBJS_DIR)/city.o $(OBJS_DIR)/timing.o | $(BIN_DIR)
 	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
 
 # 2. json parsing
@@ -146,7 +146,7 @@ TEST_WIDGETS_JSON_OBJS =  \
 	$(OBJS_DIR)/visualizer.o \
 	$(OBJS_DIR)/vis_vumeter.o \
 	$(OBJS_DIR)/city.o $(OBJS_DIR)/texture_cache.o \
-	$(OBJS_DIR)/timer.o \
+	$(OBJS_DIR)/timing.o \
 	$(OBJS_DIR)/platform_linux.o
 
 $(BIN_DIR)/test_widgets_json : $(OBJS_DIR)/test_widgets_json.o $(TEST_WIDGETS_JSON_OBJS) | $(BIN_DIR)

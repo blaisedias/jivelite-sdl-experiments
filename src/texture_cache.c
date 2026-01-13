@@ -15,7 +15,7 @@
 #include "texture_cache.h"
 #include "types.h"
 #include "logging.h"
-#include "timer.h"
+#include "timing.h"
 
 typedef struct tcache_entry tcache_entry;
 
@@ -550,7 +550,7 @@ void tcache_resolve_textures(SDL_Renderer* renderer) {
     // then if during resolution an image is loaded in another thread the counters will
     // not be equal the next time tcache_resolve_textures is invoked and resolution will occur.
     // An extra resolution scan may be performed, that is deemed an acceptable trade-off.
-    uint64_t ms_0 = getMicros();
+    uint64_t ms_0 = get_micro_seconds();
     resolution_done_counter = resolution_req_counter;
     for(texture_id_t ix=0; ix < HASHTPRIME; ++ix) {
         tcache_entry* tce = tbl[ix];
@@ -565,7 +565,7 @@ void tcache_resolve_textures(SDL_Renderer* renderer) {
             tce->surface = NULL;
         }
     }
-    uint64_t ms_1 = getMicros();
+    uint64_t ms_1 = get_micro_seconds();
     perf_printf("\ntexture_resolve: %lu, %lu ms\n",ms_1 - ms_0, (ms_1 - ms_0)/1000);
 }
 

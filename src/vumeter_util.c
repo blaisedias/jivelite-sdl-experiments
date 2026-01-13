@@ -11,7 +11,7 @@
 #include "vumeter_util.h"
 #include "visualizer.h"
 #include "util.h"
-#include "timer.h"
+#include "timing.h"
 
 // @60 FPS 30 => 1/2 a second
 static int peak_hold_counter_init_value = 30;
@@ -117,7 +117,7 @@ void VUMeter_orientate(vumeter_properties *vu, float rotation, SDL_Rect* enclosu
 static char load_buffer[4096];
 SDL_bool VUMeter_load_media(SDL_Renderer *renderer, vumeter_properties *vu) {
     int indx;
-    uint64_t ms = getMillis();
+    uint64_t ms = get_milli_seconds();
     SDL_bool ok = SDL_TRUE;
     load_printf("load media: %p\n"
             "resources: count=%d names=%p textures=%p\n",
@@ -150,7 +150,7 @@ SDL_bool VUMeter_load_media(SDL_Renderer *renderer, vumeter_properties *vu) {
             ok = ok && tcache_load_from_file(vu->resources.textures[indx], renderer);
         }
     }
-    ms = getMillis() - ms;
+    ms = get_milli_seconds() - ms;
     perf_printf("load media %s time:%lu milliseconds ok=%s\n",
                 vu->name,
                 ms,
@@ -361,12 +361,12 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
             sample_frame_count = 0;
             frame_count = 0;
             acc_render_time = 0;
-            ms_1 = getMicros();
+            ms_1 = get_micro_seconds();
         }
         prev_vumeter = vumeter;
     }
 
-    uint64_t ms0 = getMicros();
+    uint64_t ms0 = get_micro_seconds();
 
     int i;
 
@@ -506,7 +506,7 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
     vol_printf("\r");
 
 #undef _RENDER_VOLUME_LEVEL_
-    uint64_t delta_pf = getMicros() - ms0;
+    uint64_t delta_pf = get_micro_seconds() - ms0;
     acc_render_time += delta_pf;
 
     if (delta_pf > max_render_time) {
@@ -516,7 +516,7 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
     ++sample_frame_count;
     ++frame_count;
     if (sample_frame_count >= 100) {
-        ms_2 = getMicros();
+        ms_2 = get_micro_seconds();
         float fps = 1000000.0 * sample_frame_count/(ms_2-ms_1);
         switch(perf_level) {
             case 3:
