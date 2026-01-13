@@ -55,11 +55,11 @@
                 "state": 0,
                 "states": [
                     {
-                        "image": "./images/hotspot-pin-offon.png",
+                        "image": "./images/sd/hotspot-pin-offon.png",
                         "action": "lock_visu"
                     },
                     {
-                        "image": "./images/hotspot-pin-onoff.png",
+                        "image": "./images/sd/hotspot-pin-onoff.png",
                         "action": "unlock_visu"
                     }
                 ]
@@ -83,7 +83,7 @@
                 },
                 "hotspot": true,
                 "hotspot_edge": "right",
-                "image": "./images/hotspot-arrow_forward.png",
+                "image": "./images/sd/hotspot-arrow_forward.png",
                 "action": "next_visu"
             }
         },
@@ -105,7 +105,7 @@
                 },
                 "hotspot": true,
                 "hotspot_edge": "left",
-                "image": "./images/hotspot-arrow_back.png",
+                "image": "./images/sd/hotspot-arrow_back.png",
                 "action": "prev_visu"
             }
         },
@@ -121,7 +121,7 @@
                         "h": 50
                     }
                 },
-                "image": "./images/skip-previous.png",
+                "image": "./images/sd/skip-previous.png",
                 "action": "previous-track"
             }
         },
@@ -137,11 +137,11 @@
                 },
                 "states": [
                     {
-                        "image": "./images/play-circle.png",
+                        "image": "./images/sd/play-circle.png",
                         "action": "pause"
                     },
                     {
-                        "image": "./images/pause-circle.png",
+                        "image": "./images/sd/pause-circle.png",
                         "action": "play"
                     }
                 ]
@@ -157,7 +157,7 @@
                         "h": 50
                     }
                 },
-                "image": "./images/skip-next.png",
+                "image": "./images/sd/skip-next.png",
                 "action": "next-track"
             }
         },
@@ -171,7 +171,7 @@
                         "h": 50
                     }
                 },
-                "image": "./images/stop-circle.png",
+                "image": "./images/sd/stop-circle.png",
                 "action": "stop"
             }
         },
@@ -187,15 +187,15 @@
                 },
                 "states": [
                     {
-                        "image": "./images/repeat-off-to-once.png",
+                        "image": "./images/sd/repeat-off-to-once.png",
                         "action": "repeat-once"
                     },
                     {
-                        "image": "./images/repeat-once-to-repeat.png",
+                        "image": "./images/sd/repeat-once-to-repeat.png",
                         "action": "repeat"
                     },
                     {
-                        "image": "./images/repeat-to-repeat-off.png",
+                        "image": "./images/sd/repeat-to-repeat-off.png",
                         "action": "repeat-off"
                     }
                 ]
@@ -213,15 +213,15 @@
                 },
                 "states": [
                     {
-                        "image": "./images/shuffle-off-to-on.png",
+                        "image": "./images/sd/shuffle-off-to-on.png",
                         "action": "shuffle"
                     },
                     {
-                        "image": "./images/shuffle-on-to-album.png",
+                        "image": "./images/sd/shuffle-on-to-album.png",
                         "action": "shuffle-album"
                     },
                     {
-                        "image": "./images/shuffle-album-to-off.png",
+                        "image": "./images/sd/shuffle-album-to-off.png",
                         "action": "shuffle-off"
                     }
                 ]
@@ -237,7 +237,7 @@
                         "h": 50
                     }
                 },
-                "image": "./images/music-information.png",
+                "image": "./images/sd/music-information.png",
                 "action": "music-information"
             }
         },
@@ -254,21 +254,21 @@
                 "interactive": true,
                 "bar": {
                     "image": [
-                        "./images/slider-bar.png",
-                        "./images/slider-bar-empty.png"
+                        "./images/sd/slider-bar.png",
+                        "./images/sd/slider-bar-empty.png"
                     ]
                 },
                 "pick": {
-                    "image": "./images/slider-pick-circle.png",
+                    "image": "./images/sd/slider-pick-circle.png",
                     "width": 16,
                     "height": 16
                 },
                 "bar_start": {
-                    "image": "./images/slider-bar-left-end.png",
+                    "image": "./images/sd/slider-bar-left-end.png",
                     "width": 2
                 },
                 "bar_end": {
-                    "image": "./images/slider-bar-right-end-empty.png",
+                    "image": "./images/sd/slider-bar-right-end-empty.png",
                     "width": 2
                 },
                 "range": {
@@ -288,7 +288,7 @@
                         "h": 32
                     }
                 },
-                "image": "./images/close.png",
+                "image": "./images/sd/close.png",
                 "action": "quit"
             }
         }
