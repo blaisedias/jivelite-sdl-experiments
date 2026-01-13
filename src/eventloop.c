@@ -94,6 +94,7 @@ void sdl_render_loop(view_context* view) {
     debug_printf("*** render loop end ****\n");
 }
 
+#if 0
 #if 1
 #define CALIBRATION_FRAME_COUNT  360
 static int calibrate_delay(app_context* app_context) {
@@ -157,6 +158,8 @@ int calibrate_delay(SDL_Renderer* renderer) {
     return (int)(ticksum/NSAMPLES);
 }
 #endif
+#endif
+
 bool app_initialize(app_context* app_context, const char* window_title) {
     if (app_context->vsync) {
         render_flags |=  SDL_RENDERER_PRESENTVSYNC;
@@ -182,9 +185,18 @@ bool app_initialize(app_context* app_context, const char* window_title) {
     for (int i_display = 0; i_display < num_displays; ++ i_display) {
             SDL_DisplayMode dm;
             if (0 == SDL_GetCurrentDisplayMode(i_display, &dm)) {
-                printf("Display:%d fmt=%x, w=%d, h=%d, rate=%d\n",
-                        i_display,
-                        dm.format, dm.w, dm.h, dm.refresh_rate);
+                // TODO: handle multiple displays?
+                if (i_display == 0) {
+                    app_context->refresh_rate = dm.refresh_rate;
+                    app_context->frame_time_millis = 1000/dm.refresh_rate;
+                    app_context->frame_time_micros = 1000000/dm.refresh_rate;
+                    printf("Display:%d fmt=%x, w=%d, h=%d, refresh rate:%d %d milliSeconds %d microSeconds\n",
+                            i_display,
+                            dm.format, dm.w, dm.h,
+                            dm.refresh_rate,
+                            app_context->frame_time_millis,
+                            app_context->frame_time_micros);
+                }
             } 
     }
 
@@ -329,11 +341,14 @@ bool app_initialize(app_context* app_context, const char* window_title) {
         case SDL_PIXELFORMAT_NV12: printf("SDL_PIXELFORMAT_NV12\n"); break;
         case SDL_PIXELFORMAT_NV21: printf("SDL_PIXELFORMAT_NV21\n"); break;
     }
+    /*
     if (render_flags & SDL_RENDERER_PRESENTVSYNC) {
         SDL_RenderSetVSync(app_context->renderer, 1);
         app_context->delay = calibrate_delay(app_context) - 1;
         app_context->delay = MAX(app_context->delay, 1);
     }
+    */
+    app_context->delay = app_context->frame_time_millis - 1;
     return false;
 }
 

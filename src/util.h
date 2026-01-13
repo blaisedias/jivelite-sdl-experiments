@@ -17,6 +17,10 @@ typedef struct {
     int             cycle_iters;
     int             delay;
     bool            vsync;
+
+    int             refresh_rate;
+    int             frame_time_millis;
+    int             frame_time_micros;
 } app_context;
 
 extern void copyRect(const SDL_Rect *src, SDL_Rect *dst);
