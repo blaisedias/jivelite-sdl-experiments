@@ -40,6 +40,7 @@ int64_t global_inuse_counter = 1;
 uint64_t num_texture_bytes = 0;
 uint32_t resolution_req_counter;
 uint32_t resolution_done_counter;
+uint32_t max_num_texture_bytes = 0;
 
 #define PRIME2K 2039
 #define PRIME4k 4093
@@ -100,6 +101,10 @@ static void update_texture(tcache_entry* tce, const SDL_Texture* texture) {
                 tcache_printf("update_texture: texture_bytes=%d\n", num_texture_bytes);
             }
             tce->texture = texture;
+        }
+        // TODO: do this before creating the texture
+        while(max_num_texture_bytes && num_texture_bytes > max_num_texture_bytes) {
+            tcache_eject_lru();
         }
     }
 }
@@ -586,5 +591,9 @@ bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h
         return true;
     }
     return false;
+}
+
+void tcache_set_limit(int limit) {
+    max_num_texture_bytes = limit;
 }
 

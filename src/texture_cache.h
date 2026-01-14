@@ -27,4 +27,5 @@ texture_id_t tcache_get_texture_id(const char* token);
 void tcache_resolve_textures(SDL_Renderer* renderer);
 
 bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h);
+void tcache_set_limit(int);
 #endif

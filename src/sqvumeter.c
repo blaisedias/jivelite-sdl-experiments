@@ -51,6 +51,8 @@ const char* help_text=""
 "\n"
 " - peakhold <count>: number of frames for VU peak hold\n"
 " - decayhold <count>: number of frames for VU decay hold - reduces needle jitter\n"
+"\n"
+" - texture_cache_size <count>: maximum number of texture bytes\n"
 "\n";  
 
 const char* json_file="./npvu.json";
@@ -184,6 +186,11 @@ int main(int argc, char **argv) {
         } else if (0 == strcmp(argv[i], "decayhold")) {
             if (argc > i+1) {
                 VUMeter_set_decay_hold(atoi(argv[i+1]));
+                i += 1;
+            }
+        } else if (0 == strcmp(argv[i], "texture_cache_size")) {
+            if (argc > i+1) {
+                tcache_set_limit(atoi(argv[i+1]));
                 i += 1;
             }
         } else {

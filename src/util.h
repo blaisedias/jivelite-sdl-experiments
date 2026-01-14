@@ -8,6 +8,7 @@ typedef struct {
     SDL_Rect        window_rect;
     SDL_Renderer*   renderer;
     Uint32          pixelFormat;
+    unsigned        bytes_per_pixel;
     SDL_Window*     window;
     bool            fullscreen;
 

@@ -49,6 +49,8 @@ fi
 if [ -f "/usr/local/etc/pcp/pcpversion.cfg" ]; then
     echo "Platform is piCorePlayer, setting up touch screen"
     pcp_setup
+    export TCACHE_SIZE="texture_cache_size 59768832"
 fi
+export TCACHE_SIZE="texture_cache_size 50000000"
 
-./bin/sqvumeter dl ./lib/TubeD.so  dl ./lib/Chevrons.so dl ./lib/PurpleTastic.so vsync vu PurpleTastic2Transparent $*
+./bin/sqvumeter dl ./lib/TubeD.so  dl ./lib/Chevrons.so dl ./lib/PurpleTastic.so vsync vu PurpleTastic2Transparent $* $TCACHE_SIZE

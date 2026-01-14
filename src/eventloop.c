@@ -291,12 +291,13 @@ bool app_initialize(app_context* app_context, const char* window_title) {
     }
     SDL_GetWindowSize(app_context->window, &app_context->screen_width, &app_context->screen_height);
     app_context->pixelFormat = SDL_GetWindowPixelFormat(app_context->window);
+    app_context->bytes_per_pixel = SDL_BYTESPERPIXEL(app_context->pixelFormat);
 
 //    srand((unsigned)time(NULL));
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
     SDL_RenderSetLogicalSize(app_context->renderer, app_context->screen_width, app_context->screen_height);
 
-    printf("pixeFormat: %x ", app_context->pixelFormat);
+    printf("pixelFormat: 0x%x %u bytes/pixel ", app_context->pixelFormat, app_context->bytes_per_pixel);
     switch(app_context->pixelFormat) {
         case SDL_PIXELFORMAT_UNKNOWN: printf("SDL_PIXELFORMAT_UNKNOWN\n"); break;
         case SDL_PIXELFORMAT_INDEX1LSB: printf("SDL_PIXELFORMAT_INDEX1LSB\n"); break;
