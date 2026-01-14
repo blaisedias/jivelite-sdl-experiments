@@ -512,7 +512,8 @@ void sdl_input_loop(view_context* view) {
                 break;
             }
         }
-        SDL_Delay(100);
+//        SDL_Delay(100);
+        sleep_milli_seconds(100);
     }
     stop_touch_screen_event_generator();
     debug_printf("*** input loop end ****\n");

@@ -3,4 +3,5 @@
 
 uint64_t get_micro_seconds();
 uint64_t get_milli_seconds();
+void sleep_milli_seconds(unsigned millis);
 #endif
