@@ -522,11 +522,12 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
             case 3:
             case 2:
             default:
-                perf_printf("\rFPS:%05.2f frame:millis: avg:%5.2f, max:%05.2f sample: millis:%5.2f, frames:%d",
+                perf_printf("\rFPS:%05.2f frame:millis: avg:%5.2f, max:%05.2f sample: millis:%5.2f, frames:%d texture_cache:%ld",
                         fps,
                         ((float)acc_render_time/sample_frame_count)/1000,
                         (float)max_render_time/1000,
-                        (float)(ms_2 - ms_1)/1000, sample_frame_count
+                        (float)(ms_2 - ms_1)/1000, sample_frame_count,
+                        tcache_get_texture_bytes_count()
                     );
         }
         sample_frame_count = 0;
