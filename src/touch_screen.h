@@ -4,6 +4,7 @@
 #include <tslib.h>
 
 typedef struct {
+    unsigned  sleeptime;
     void (*up)(int x , int y);
     void (*down)(int x , int y);
     void (*motion)(int x , int y);

@@ -153,7 +153,7 @@ $(BIN_DIR)/test_widgets_json : $(OBJS_DIR)/test_widgets_json.o $(TEST_WIDGETS_JS
 	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
 
 # 3. touch screen
-$(BIN_DIR)/test_touch: $(OBJS_DIR)/test_touch.o $(OBJS_DIR)/touch_screen.o
+$(BIN_DIR)/test_touch: $(OBJS_DIR)/test_touch.o $(OBJS_DIR)/touch_screen.o $(OBJS_DIR)/timing.o
 	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
 
 # directories
