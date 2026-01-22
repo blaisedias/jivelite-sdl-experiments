@@ -9,7 +9,7 @@ void tcache_init(void);
 void tcache_set_renderer_tid(const SDL_threadID);
 
 // { These functions must be called in the thread that created the renderer
-void tcache_resolve_textures(SDL_Renderer* renderer);
+int tcache_resolve_textures(SDL_Renderer* renderer);
 texture_id_t tcache_put_texture(const char* token, const SDL_Texture* texture);
 bool tcache_set_texture(texture_id_t texture_id, const SDL_Texture* texture);
 SDL_Texture* tcache_get_texture(const char* token, texture_id_t* texture_id);

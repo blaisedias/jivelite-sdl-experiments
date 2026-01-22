@@ -61,6 +61,7 @@ static tcache_entry* tbl[NUM_TBL_ENTRIES];
 static SDL_threadID renderer_tid;
 
 void tcache_set_renderer_tid(const SDL_threadID tid) {
+    tcache_init();
     if (renderer_tid == 0) {
         renderer_tid = tid; 
     } else {
@@ -385,24 +386,25 @@ static int lru_sort_tce(tcache_entry** lru_sorted_tbl) {
     return indx;
 }
 
-static bool cap_exceeded(int increment, int ix) {
+static bool cap_exceeded(int increment, int ejected) {
     return max_num_texture_bytes && (num_texture_bytes + increment) > max_num_texture_bytes;
 }
 
 // Eject least recently used textures to reduce texture bytes to the configured limit
 static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
     static tcache_entry* eject_tbl[HASHTPRIME];
-    bool ejected = false;
+    int ejected_count = 0;
     int count = lru_sort_tce(eject_tbl);
-    for(int ix=0; ix < count && check(increment, ix); ++ix) {
+    for(int ix=0; ix < count && check(increment, ejected_count); ++ix) {
         tcache_entry* tce = eject_tbl[ix];
         if (!tce->locked && tce->texture) {
             release_texture(tce);
-            tcache_eject_printf("tcache_cap_num_bytes: ejected %s %d %u / %u\n", tce->path, increment, num_texture_bytes, max_num_texture_bytes);
-            ejected = true;
+            tce->ejected = true;
+            ++ejected_count;
+            tcache_eject_printf("tcache_eject: %s %d %u / %u\n", tce->path, increment, num_texture_bytes, max_num_texture_bytes);
         }
     }
-    return ejected;
+    return ejected_count;
 }
 
 // Eject least recently used textures to reduce texture bytes to the configured limit
@@ -410,8 +412,8 @@ static void tcache_cap_num_bytes(unsigned increment) {
     tcache_eject(increment, cap_exceeded);
 }
 
-static bool test_cap_exceeded(int increment, int ix) {
-    return ix == 0;
+static bool test_cap_exceeded(int increment, int ejected_count) {
+    return ejected_count == 0;
 }
 
 // TESTING ONLY function: Eject least recently used texture: use for testing LRU 
@@ -485,12 +487,14 @@ void tcache_dump() {
         for(int ix=0; ix < HASHTPRIME; ++ix) {
             tcache_entry* tce = tbl[ix];
             if (tce) {
-                printf("    %05d) delta=%4d hashv=%08x inuse=%016lx %s %p w=%4d h=%4d bytes=%8d %s\n",
+                printf("    %05d) delta=%4d hashv=%08x inuse=%016lx %s tce=%p surface:%p texture=%p w=%4d h=%4d bytes=%8d %s\n",
                        ix, ix - last_ix,
                        tce->hashv,
                        tce->inuse_counter,
                        tce->locked ? "locked  ": "unlocked",
                        tce,
+                       tce->surface,
+                       tce->texture,
                        tce->w,
                        tce->h,
                        tce->num_bytes,
@@ -592,10 +596,11 @@ texture_id_t tcache_get_texture_id(const char* token) {
     return INVALID_TEXTURE_ID;
 }
 
-void tcache_resolve_textures(SDL_Renderer* renderer) {
+int tcache_resolve_textures(SDL_Renderer* renderer) {
+    int resolved_count = 0;
     tcache_init();
     if (!check_permitted()) {
-        return;
+        return resolved_count;
     }
     // signalling between threads.
     // synchronisation primitives could be used but this is simpler and lockless.
@@ -603,7 +608,7 @@ void tcache_resolve_textures(SDL_Renderer* renderer) {
     // When resolution is performed the done counter is synchronised with the req counter
     // since *all* resolutions are perfromed.
     if (resolution_req_counter == resolution_done_counter) {
-        return;
+        return resolved_count;
     }
     // Resolution is required:
     // BEFORE resolving synchronise the request and donecounter values,
@@ -623,10 +628,12 @@ void tcache_resolve_textures(SDL_Renderer* renderer) {
             update_texture(tce, texture);
             SDL_FreeSurface(tce->surface);
             tce->surface = NULL;
+            ++resolved_count;
         }
     }
     uint64_t ms_1 = get_micro_seconds();
     perf_printf("\ntexture_resolve: %5.2f millis\n", (float)(ms_1 - ms_0)/1000);
+    return resolved_count;
 }
 
 // Get texture width and height 
