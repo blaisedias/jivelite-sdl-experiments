@@ -34,7 +34,8 @@ const char* help_text=""
 " - printfframeperf   enable printing of performance metrics for each frame\n"
 " - printfjson   enable printing of json processing\n"
 " - printfaction enable printing of actions\n"
-" - printftache enable printing of texture cache module\n"
+" - printftcache enable printing of texture cache module\n"
+" - printftcacheeject enable printing of texture cache module ejects\n"
 "\n"  
 " - list list the set of VU Meters and exit\n"
 " - dl <path-to-object-file> : dynamically load VU meter in object file\n"
@@ -140,6 +141,8 @@ int main(int argc, char **argv) {
             enable_printf(ACTION_PRINTF);
         } else if (0 == strcmp(argv[i], "printftcache")) {
             enable_printf(TEXTURE_CACHE_PRINTF);
+        } else if (0 == strcmp(argv[i], "printftcacheeject")) {
+            enable_printf(TEXTURE_CACHE_EJECT_PRINTF);
         } else if (0 == strcmp(argv[i], "showrects")) {
             show_rects = true;
         } else if (0 == strcmp(argv[i], "showinputrects")) {

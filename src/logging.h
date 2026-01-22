@@ -17,6 +17,7 @@ extern void (*scale_printf)(char *format, ...);
 extern void (*input_printf)(char *format, ...);
 extern void (*debug_printf)(char *format, ...);
 extern void (*tcache_printf)(char *format, ...);
+extern void (*tcache_eject_printf)(char *format, ...);
 extern void (*frame_perf_printf)(char *format, ...);
 extern void (*json_printf)(char *format, ...);
 extern void (*action_printf)(char *format, ...);
@@ -32,6 +33,7 @@ typedef enum {
     FRAME_PERF_PRINTF,
     JSON_PRINTF,
     ACTION_PRINTF,
+    TEXTURE_CACHE_EJECT_PRINTF,
 }vu_printf_typ;
 
 void enable_printf(vu_printf_typ v);

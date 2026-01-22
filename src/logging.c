@@ -37,6 +37,7 @@ void (*scale_printf)(char *format, ...) = dummy_printf;
 void (*input_printf)(char *format, ...) = dummy_printf;
 void (*debug_printf)(char *format, ...) = dummy_printf;
 void (*tcache_printf)(char *format, ...) = dummy_printf;
+void (*tcache_eject_printf)(char *format, ...) = dummy_printf;
 void (*frame_perf_printf)(char *format, ...) = dummy_printf;
 void (*json_printf)(char *format, ...) = dummy_printf;
 void (*action_printf)(char *format, ...) = dummy_printf;
@@ -64,6 +65,9 @@ void enable_printf(vu_printf_typ v) {
             break;
         case TEXTURE_CACHE_PRINTF:
             tcache_printf = logfprintf;
+            break;
+        case TEXTURE_CACHE_EJECT_PRINTF:
+            tcache_eject_printf = logfprintf;
             break;
         case FRAME_PERF_PRINTF:
             frame_perf_printf = logfprintf;
@@ -99,6 +103,9 @@ void disable_printf(vu_printf_typ v) {
             break;
         case TEXTURE_CACHE_PRINTF:
             tcache_printf = dummy_printf;
+            break;
+        case TEXTURE_CACHE_EJECT_PRINTF:
+            tcache_eject_printf = dummy_printf;
             break;
         case FRAME_PERF_PRINTF:
             frame_perf_printf = dummy_printf;
