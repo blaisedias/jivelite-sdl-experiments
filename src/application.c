@@ -7,6 +7,7 @@
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_blendmode.h>
 
+#include "application.h"
 #include "widgets.h"
 #include "touch_screen_sdl2.h"
 #include "visualizer.h"

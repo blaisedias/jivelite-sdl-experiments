@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <SDL2/SDL.h>
+#include "application.h"
 #include "widgets.h"
 #include "actions.h"
 #include "logging.h"

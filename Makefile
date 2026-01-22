@@ -55,10 +55,10 @@ CC = gcc
 CF_PIC = $(CF) -fpic
 CF_SHARED = $(CF) -fpic -shared
 
-SHARED_OBJS = $(LIB_DIR)/Chevrons.so $(LIB_DIR)/PurpleTastic.so $(LIB_DIR)/TubeD.so
+SHARED_OBJS = $(LIB_DIR)/Chevrons.so $(LIB_DIR)/PurpleTastic.so $(LIB_DIR)/TubeD.so $(LIB_DIR)/xTubeD.so
 SQVUMETER_OBJS = \
 		  $(OBJS_DIR)/sqvumeter.o \
-		  $(OBJS_DIR)/eventloop.o \
+		  $(OBJS_DIR)/application.o \
    		  $(OBJS_DIR)/util.o $(OBJS_DIR)/widgets.o $(OBJS_DIR)/actions.o \
    		  $(OBJS_DIR)/vumeter_widget.o $(OBJS_DIR)/vumeter_util.o $(OBJS_DIR)/visualizer.o $(OBJS_DIR)/vis_vumeter.o \
    		  $(OBJS_DIR)/json.o $(OBJS_DIR)/widgets_json.o \

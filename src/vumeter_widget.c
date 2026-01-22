@@ -9,7 +9,7 @@
 #include <SDL2/SDL_syswm.h>
 #include <time.h>
 #include "vumeter_util.h"
-#include "types.h"
+#include "application.h"
 #include "widgets.h"
 #include "visualizer.h"
 

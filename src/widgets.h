@@ -1,5 +1,5 @@
-#ifndef __CONTROL_H_
-#define __CONTROL_H_
+#ifndef __jl_widgets_h_
+#define __jl_widgets_h_
 #include <SDL2/SDL.h>
 #include "util.h"
 #include "actions.h"
@@ -213,4 +213,4 @@ widget_list* destroy_widgets_in_list(widget_list*);
 void widget_dispatch_action(widget* wdgt);
 void widget_list_load_media(const widget_list* list, const char* resource_path);
 void widget_list_react(const widget_list* list, const pointer_input input, SDL_Point* pt);
-#endif
+#endif // __jl_widgets_h_

@@ -1,5 +1,5 @@
-#ifndef __action_h_
-#define __action_h_
+#ifndef __jl_action_h_
+#define __jl_action_h_
 /*
 void action_quit(widget* wdgt);
 void action_next_visu(widget* wdgt);
@@ -56,4 +56,4 @@ typedef enum {
 
 action action_from_string(const char* str);
 const char* action_to_string(action action); 
-#endif
+#endif // __jl_action_h_

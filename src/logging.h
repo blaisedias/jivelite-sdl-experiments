@@ -5,8 +5,8 @@
 */
 
 
-#ifndef  _logging_h_
-#define _logging_h_
+#ifndef  __jl_logging_h_
+#define __jl_logging_h_
 extern void error_printf(char *format, ...);
 extern void dummy_printf(char *format, ...);
 
@@ -37,4 +37,4 @@ typedef enum {
 void enable_printf(vu_printf_typ v);
 void disable_printf(vu_printf_typ v);
 
-#endif
+#endif // __jl_loggging_h_

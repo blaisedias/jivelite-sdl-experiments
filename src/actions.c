@@ -1,3 +1,4 @@
+#include "application.h"
 #include "actions.h"
 #include "widgets.h"
 #include "logging.h"

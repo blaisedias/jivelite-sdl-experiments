@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "types.h"
+#include "application.h"
 #include "widgets.h"
 #include "vumeter_util.h"
 #include "widgets_json.h"
