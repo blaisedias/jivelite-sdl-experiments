@@ -290,6 +290,7 @@ bool app_initialize(app_context* app_context, const char* window_title) {
         error_printf("creating renderer: %s\n", SDL_GetError());
         return true;
     }
+    tcache_set_renderer_tid(SDL_GetThreadID(NULL));
     SDL_GetWindowSize(app_context->window, &app_context->screen_width, &app_context->screen_height);
     app_context->pixelFormat = SDL_GetWindowPixelFormat(app_context->window);
     app_context->bytes_per_pixel = SDL_BYTESPERPIXEL(app_context->pixelFormat);

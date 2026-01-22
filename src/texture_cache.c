@@ -58,6 +58,22 @@ unsigned resolution_done_counter;
 #define NUM_TBL_ENTRIES HASHTPRIME+1
 static tcache_entry* tbl[NUM_TBL_ENTRIES];
 
+static SDL_threadID renderer_tid;
+
+void tcache_set_renderer_tid(const SDL_threadID tid) {
+    if (renderer_tid == 0) {
+        renderer_tid = tid; 
+    } else {
+        printf("Changing renderer thread ID is unsupported\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//
+bool check_permitted() {
+    return SDL_GetThreadID(NULL) == renderer_tid;
+}
+
 // only for used by quick sort
 static void swap_tcache_entries(tcache_entry** a, tcache_entry** b) {
   tcache_entry* t = *a;
@@ -160,6 +176,10 @@ static void update_texture(tcache_entry* tce, const SDL_Texture* texture) {
 //             for example textures created to render text.
 // returns: texture ID (quick access slot in the hash table)
 texture_id_t tcache_put_texture(const char* path, const SDL_Texture* texture) {
+    if (!check_permitted()) {
+        return -1;
+    }
+
     uint32_t hashv = hashfn(path);
     texture_id_t indx = hashv%HASHTPRIME;
     int hop_count = 0;
@@ -205,6 +225,9 @@ texture_id_t tcache_put_texture(const char* path, const SDL_Texture* texture) {
 // returns: true for success, false otherwise
 //          false ==> invalid ID or uninitialised quick access slot.
 bool tcache_set_texture(texture_id_t texture_id, const SDL_Texture* texture) {
+    if (!check_permitted()) {
+        return false;
+    }
     if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_set_texture: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
@@ -227,6 +250,9 @@ bool tcache_set_texture(texture_id_t texture_id, const SDL_Texture* texture) {
 // returns: texture, NULL is the texture is not found
 //          texture ID or INVALID_TEXTURE_ID is texture is not found
 SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
+    if (!check_permitted()) {
+        return NULL;
+    }
     uint32_t hashv = hashfn(path);
     texture_id_t indx = hashv%HASHTPRIME;
     tcache_entry* tce = tbl[indx];
@@ -258,6 +284,9 @@ SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
 // returns: texture, NULL is the texture is not found
 //          texture ID
 SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
+    if (!check_permitted()) {
+        return NULL;
+    }
     if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_quick_get_texture: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
@@ -279,6 +308,9 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
 // returns: texture, NULL is the texture is not found
 //          texture ID or -1 is texture is not found
 bool tcache_quick_get_texture_ejected(texture_id_t texture_id) {
+    if (!check_permitted()) {
+        return false;
+    }
     if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_quick_get_texture_ejected: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
@@ -294,6 +326,9 @@ bool tcache_quick_get_texture_ejected(texture_id_t texture_id) {
 // Delete texture 
 // texture_id*: quick access texture ID
 bool tcache_quick_delete_texture(texture_id_t texture_id) {
+    if (!check_permitted()) {
+        return false;
+    }
     if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_quick_delete_texture: invalid id: %d\n", texture_id);
         exit(EXIT_FAILURE);
@@ -318,6 +353,9 @@ bool tcache_quick_delete_texture(texture_id_t texture_id) {
 // Delete texture 
 // path: path to image file - or unique string identifier
 bool tcache_delete_texture(const char* path) {
+    if (!check_permitted()) {
+        return false;
+    }
     uint32_t hashv = hashfn(path);
     texture_id_t indx = hashv%HASHTPRIME;
     tcache_entry* tce = tbl[indx];
@@ -347,32 +385,39 @@ static int lru_sort_tce(tcache_entry** lru_sorted_tbl) {
     return indx;
 }
 
+static bool cap_exceeded(int increment, int ix) {
+    return max_num_texture_bytes && (num_texture_bytes + increment) > max_num_texture_bytes;
+}
+
 // Eject least recently used textures to reduce texture bytes to the configured limit
-static void tcache_cap_num_bytes(unsigned inc) {
+static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
     static tcache_entry* eject_tbl[HASHTPRIME];
-    if (max_num_texture_bytes && (num_texture_bytes + inc) > max_num_texture_bytes) {
-        int count = lru_sort_tce(eject_tbl);
-        for(int ix =0; ix < count && (num_texture_bytes + inc) > max_num_texture_bytes; ++ix) {
-            tcache_entry* tce = eject_tbl[ix];
-            if (!tce->locked && tce->texture) {
-                release_texture(tce);
-                printf("tcache_cap_num_bytes: ejected %s\n", tce->path);
-            }
+    bool ejected = false;
+    int count = lru_sort_tce(eject_tbl);
+    for(int ix=0; ix < count && check(increment, ix); ++ix) {
+        tcache_entry* tce = eject_tbl[ix];
+        if (!tce->locked && tce->texture) {
+            release_texture(tce);
+            tcache_eject_printf("tcache_cap_num_bytes: ejected %s %d %u / %u\n", tce->path, increment, num_texture_bytes, max_num_texture_bytes);
+            ejected = true;
         }
     }
+    return ejected;
+}
+
+// Eject least recently used textures to reduce texture bytes to the configured limit
+static void tcache_cap_num_bytes(unsigned increment) {
+    tcache_eject(increment, cap_exceeded);
+}
+
+static bool test_cap_exceeded(int increment, int ix) {
+    return ix == 0;
 }
 
 // TESTING ONLY function: Eject least recently used texture: use for testing LRU 
 bool tcache_test_lru_eject() {
-    static tcache_entry* eject_tbl[HASHTPRIME];
-    int count = lru_sort_tce(eject_tbl);
-    for(int ix =0; ix < count; ++ix) {
-        tcache_entry* tce = eject_tbl[ix];
-        if (!tce->locked && tce->texture) {
-            release_texture(tce);
-            tcache_printf("tcache_eject_lru: ejected %s\n", tce->path);
-            return true;
-        }
+    if (check_permitted()) {
+        return tcache_eject(0, test_cap_exceeded);
     }
     return false;
 }
@@ -549,6 +594,9 @@ texture_id_t tcache_get_texture_id(const char* token) {
 
 void tcache_resolve_textures(SDL_Renderer* renderer) {
     tcache_init();
+    if (!check_permitted()) {
+        return;
+    }
     // signalling between threads.
     // synchronisation primitives could be used but this is simpler and lockless.
     // When an image is loaded into a surface the request counter is incremented

@@ -6,6 +6,7 @@ typedef int  texture_id_t;
 #define INVALID_TEXTURE_ID -1
 
 void tcache_init(void);
+void tcache_set_renderer_tid(const SDL_threadID);
 
 // { These functions must be called in the thread that created the renderer
 void tcache_resolve_textures(SDL_Renderer* renderer);
