@@ -35,12 +35,13 @@ struct tcache_entry {
 static tcache_entry empty_tce = {
     .path = "___empty___",
 };
+static void tcache_cap_num_bytes(unsigned inc);
 
 int64_t global_inuse_counter = 1;
-uint64_t num_texture_bytes = 0;
-uint32_t resolution_req_counter;
-uint32_t resolution_done_counter;
-uint32_t max_num_texture_bytes = 0;
+unsigned num_texture_bytes = 0;
+unsigned max_num_texture_bytes = 0;
+unsigned resolution_req_counter;
+unsigned resolution_done_counter;
 
 #define PRIME2K 2039
 #define PRIME4k 4093
@@ -56,6 +57,50 @@ uint32_t max_num_texture_bytes = 0;
 #define COLLISION_STEP PRIME32k
 #define NUM_TBL_ENTRIES HASHTPRIME+1
 static tcache_entry* tbl[NUM_TBL_ENTRIES];
+
+// only for used by quick sort
+static void swap_tcache_entries(tcache_entry** a, tcache_entry** b) {
+  tcache_entry* t = *a;
+  *a = *b;
+  *b = t;
+}
+
+static int qs_tcache_partition(tcache_entry** tce_arr, int lo, int hi) {
+    // last element is the pivot
+    tcache_entry* pivot = tce_arr[hi];
+
+    // temp pivot
+    int i = lo-1;
+    for (int j = lo; j < hi; j++) {
+        // if the current element <= pivot 
+        if (tce_arr[j]->inuse_counter <= pivot->inuse_counter) {
+            // move temporary pivot index forward
+            ++i;
+            // swap current element with temporary pivot
+            swap_tcache_entries(tce_arr+i, tce_arr+j);
+        }
+    }
+    // swap last element with pivot
+    swap_tcache_entries(tce_arr+i+1, tce_arr+hi);
+    // return pivot index
+    return i+1;
+}
+
+static void qs_tcache_range(tcache_entry** tce_arr, int lo, int hi) {
+    if (lo < hi) {
+        // partition the array to get the pivot index
+        int pivot = qs_tcache_partition(tce_arr, lo, hi);
+        // sort the left side
+        qs_tcache_range(tce_arr, lo, pivot-1);
+        // sort the right side
+        qs_tcache_range(tce_arr, pivot+1, hi);
+    }
+}
+
+static void quick_sort_tcache(tcache_entry** tce_arr, int num_elements) {
+    qs_tcache_range(tce_arr, 0, num_elements-1);
+}
+
 
 void tcache_init(void) {
     static bool initialised = false;
@@ -103,9 +148,7 @@ static void update_texture(tcache_entry* tce, const SDL_Texture* texture) {
             tce->texture = texture;
         }
         // TODO: do this before creating the texture
-        while(max_num_texture_bytes && num_texture_bytes > max_num_texture_bytes) {
-            tcache_eject_lru();
-        }
+        tcache_cap_num_bytes(0);
     }
 }
 
@@ -291,30 +334,45 @@ bool tcache_delete_texture(const char* path) {
 
 }
 
-// Eject least recently used texture
-bool tcache_eject_lru() {
-    texture_id_t indx = -1;
-    tcache_entry dummy = { .inuse_counter=global_inuse_counter, .texture=NULL, .path="" };
-    tcache_entry* candidate_tce = &dummy;
-    for(texture_id_t ix=0; ix < HASHTPRIME; ++ix) {
+static int lru_sort_tce(tcache_entry** lru_sorted_tbl) {
+    int indx = 0;
+    for(int ix=0; ix < HASHTPRIME; ++ix) {
         tcache_entry* tce = tbl[ix];
         if (tce) {
-            if (!tce->locked && tce->texture && tce->inuse_counter < candidate_tce->inuse_counter) {
-                candidate_tce = tce;
-                indx = ix;
+           lru_sorted_tbl[indx] = tce;
+            ++indx;
+        }
+    }
+    quick_sort_tcache(lru_sorted_tbl, indx);
+    return indx;
+}
+
+// Eject least recently used textures to reduce texture bytes to the configured limit
+static void tcache_cap_num_bytes(unsigned inc) {
+    static tcache_entry* eject_tbl[HASHTPRIME];
+    if (max_num_texture_bytes && (num_texture_bytes + inc) > max_num_texture_bytes) {
+        int count = lru_sort_tce(eject_tbl);
+        for(int ix =0; ix < count && (num_texture_bytes + inc) > max_num_texture_bytes; ++ix) {
+            tcache_entry* tce = eject_tbl[ix];
+            if (!tce->locked && tce->texture) {
+                release_texture(tce);
+                printf("tcache_cap_num_bytes: ejected %s\n", tce->path);
             }
         }
     }
+}
 
-    if (candidate_tce && candidate_tce != &dummy) {
-        candidate_tce->ejected = true;
-        if (candidate_tce->texture) {
-            release_texture(candidate_tce);
+// TESTING ONLY function: Eject least recently used texture: use for testing LRU 
+bool tcache_test_lru_eject() {
+    static tcache_entry* eject_tbl[HASHTPRIME];
+    int count = lru_sort_tce(eject_tbl);
+    for(int ix =0; ix < count; ++ix) {
+        tcache_entry* tce = eject_tbl[ix];
+        if (!tce->locked && tce->texture) {
+            release_texture(tce);
+            tcache_printf("tcache_eject_lru: ejected %s\n", tce->path);
+            return true;
         }
-        tcache_printf("tcache_eject_lru: %d %s\n", indx, candidate_tce->path);
-        return true;
-    } else {
-        tcache_printf("tcache_eject_lru: nothing to eject\n");
     }
     return false;
 }
@@ -337,6 +395,7 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
         // Only load if not previously loaded
         if (tce->texture == NULL) {
            if (tce->surface == NULL) {
+                tcache_printf("tcache_load_from_file: : %d %s\n", texture_id, tce->path);
                 tce->surface = IMG_Load(tce->path);
                 if (tce->surface == NULL)  {
                     error_printf("tcache_load_from_file: failed: %d %s\n", texture_id, tce->path);
@@ -358,16 +417,11 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
 // Load texture from file and add it to the texture cache.
 // path : path to image file
 // renderer : SDL renderer context
-// returns: texture, NULL is the texture is not found
-//          texture ID or -1 is texture is not found
-texture_id_t  tcache_load_media(const char* path, SDL_Renderer* renderer, bool* ploaded) {
+// returns: texture ID
+texture_id_t tcache_load_media(const char* path, SDL_Renderer* renderer, bool* ploaded) {
     texture_id_t texture_id = tcache_put_texture(path, NULL);
     tcache_printf("tcache_load_media: id=%d path=%s\n", texture_id, path);
     bool loaded = tcache_load_from_file(texture_id, renderer);
-    if (!loaded) {
-        tcache_eject_lru();
-        loaded = tcache_load_from_file(texture_id, renderer);
-    }
     if (ploaded) {
         *ploaded = loaded;
     }
@@ -375,55 +429,8 @@ texture_id_t  tcache_load_media(const char* path, SDL_Renderer* renderer, bool* 
     return texture_id;
 }
 
-
-static void swap_tcache_entries(tcache_entry** a, tcache_entry** b) {
-  tcache_entry* t = *a;
-  *a = *b;
-  *b = t;
-}
-
-static int qs_tcache_partition(tcache_entry** tce_arr, int lo, int hi) {
-    // last element is the pivot
-    tcache_entry* pivot = tce_arr[hi];
-
-    // temp pivot
-    int i = lo-1;
-    for (int j = lo; j < hi; j++) {
-        // if the current element <= pivot 
-        if (tce_arr[j]->inuse_counter <= pivot->inuse_counter) {
-            // move temporary pivot index forward
-            ++i;
-            // swap current element with temporary pivot
-            swap_tcache_entries(tce_arr+i, tce_arr+j);
-        }
-    }
-    // swap last element with pivot
-    swap_tcache_entries(tce_arr+i+1, tce_arr+hi);
-    // return pivot index
-    return i+1;
-}
-
-static void qs_tcache_range(tcache_entry** tce_arr, int lo, int hi) {
-    if (lo < hi) {
-        // partition the array to get the pivot index
-        int pivot = qs_tcache_partition(tce_arr, lo, hi);
-        // sort the left side
-        qs_tcache_range(tce_arr, lo, pivot-1);
-        // sort the right side
-        qs_tcache_range(tce_arr, pivot+1, hi);
-    }
-}
-
-static void quick_sort_tcache(tcache_entry** tce_arr, int num_elements) {
-    qs_tcache_range(tce_arr, 0, num_elements-1);
-}
-
-//static int comp(const void* a, const void *b) {
-//    return ((tcache_entry*)a)->inuse_counter - ((tcache_entry*)b)->inuse_counter;
-//}
-
-static tcache_entry* stbl[HASHTPRIME];
 void tcache_dump() {
+    static tcache_entry* stbl[HASHTPRIME];
     {
         int count = 0;
         int last_ix = 0;
@@ -482,7 +489,7 @@ void tcache_dump() {
         printf("Memory used for table entries = %ld\n", count * sizeof(tcache_entry));
         printf("Sizeof cache_entry = %ld\n", sizeof(tcache_entry));
         printf("Sizeof table = %ld\n", sizeof(tbl));
-        printf("Texture bytes = %ld %f MiB, locked=%ld %f MiB, unlocked=%ld %f MiB, ejected=%ld %f MiB\n", 
+        printf("Texture bytes = %u %f MiB, locked=%ld %f MiB, unlocked=%ld %f MiB, ejected=%ld %f MiB\n", 
                 num_texture_bytes, (float)num_texture_bytes/(1024*1024),
                 locked_texture_bytes, (float)locked_texture_bytes/(1024*1024),
                 unlocked_texture_bytes, (float)unlocked_texture_bytes/(1024*1024),
@@ -491,7 +498,7 @@ void tcache_dump() {
     printf("-----------------------------\n");
 }
 
-int64_t tcache_get_texture_bytes_count(void) {
+unsigned tcache_get_texture_bytes_count(void) {
     return num_texture_bytes;
 }
 
@@ -571,7 +578,7 @@ void tcache_resolve_textures(SDL_Renderer* renderer) {
         }
     }
     uint64_t ms_1 = get_micro_seconds();
-    perf_printf("\ntexture_resolve: %lu, %lu ms\n",ms_1 - ms_0, (ms_1 - ms_0)/1000);
+    perf_printf("\ntexture_resolve: %5.2f millis\n", (float)(ms_1 - ms_0)/1000);
 }
 
 // Get texture width and height 
@@ -593,7 +600,6 @@ bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h
     return false;
 }
 
-void tcache_set_limit(int limit) {
+void tcache_set_limit(unsigned limit) {
     max_num_texture_bytes = limit;
 }
-

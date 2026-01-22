@@ -870,7 +870,7 @@ int main(int argc, const char** argv) {
     {
         for(int ix=0; ix < num_images; ++ix) {
             const SDL_Texture *texture2;
-                if (tcache_eject_lru() ) {
+                if (tcache_test_lru_eject() ) {
                     texture2 = tcache_quick_get_texture(ids[ix]);
                     if (texture2) {
                         printf("%d) texture LRU eject failed id=%d %p\n", ix, ids[ix], texture2);
@@ -911,7 +911,7 @@ int main(int argc, const char** argv) {
     for(int ix=0; ix < num_images; ++ix) {
         if(ix%2 != 0) {
             const SDL_Texture *texture2;
-            if (tcache_eject_lru() ) {
+            if (tcache_test_lru_eject() ) {
                 texture2 = tcache_quick_get_texture(ids[ix]);
                 if (texture2) {
                     printf("%d) texture LRU eject failed id=%d %p\n", ix, ids[ix], texture2);
