@@ -64,6 +64,7 @@ void sdl_render_loop(view_context* view) {
         }
 
         SDL_RenderPresent(app_context->renderer);
+        SDL_PumpEvents();
         Uint64 pc_3 = SDL_GetPerformanceCounter();
         uint64_t ms_3 = get_micro_seconds();
         frame_perf_printf("\r%05.2f ms, %05.2f ms  %lu %lu %lu %lu %lu %lu                     ",
@@ -397,7 +398,7 @@ void sdl_input_loop(view_context* view) {
 
     while (input_loop) {
         SDL_Event event;
-        while (SDL_PollEvent(&event)) {
+        while(SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_FIRSTEVENT, SDL_LASTEVENT)) {
             switch (event.type) {
             case USEREVENT_NEXT_VISU:
             case USEREVENT_NEXT_VU:
@@ -442,6 +443,7 @@ void sdl_input_loop(view_context* view) {
                 default:
                     break;
                 }
+                break;
             case SDL_MOUSEMOTION:
                 {
                     SDL_ShowCursor(SDL_ENABLE);

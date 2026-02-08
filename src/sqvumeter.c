@@ -253,6 +253,7 @@ int main(int argc, char **argv) {
     }
 
     print_app_runtime_info(&app.context);
+    SDL_PumpEvents();
     SDL_Thread* input_thread = SDL_CreateThread((SDL_ThreadFunction)sdl_input_loop, "input", &view);
     sdl_render_loop(&view);
     SDL_WaitThread(input_thread, NULL);
