@@ -948,6 +948,7 @@ int main(int argc, const char** argv) {
             exit(EXIT_FAILURE);
         }
        //TODO programmatically check that cache is empty
+        tcache_dump();
         endoftest();
     }
 
