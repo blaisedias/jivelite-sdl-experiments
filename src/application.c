@@ -34,52 +34,52 @@ void sdl_render_loop(view_context* view) {
     Uint32 iters = 0;
 
     while (render_loop) {
-        tcache_resolve_textures(app_context->renderer);
         uint64_t ms_0 = get_micro_seconds();
-        uint64_t pc_0 = SDL_GetPerformanceCounter();
+        tcache_resolve_textures(app_context->renderer);
+        uint64_t ms_1 = get_micro_seconds();
         if (hide_cursor_count) {
             if (0 >= --hide_cursor_count) {
                 SDL_ShowCursor(SDL_DISABLE);
                 hide_cursor_count = 0;
-                    for(widget* widget=view->list->tail.prev; widget != NULL; widget=widget->prev) {
-                        if (widget->hidden) { continue;}
-                        widget->focussed = false;
-                        widget->highlight = false;
-                    }
+                for(widget* widget=view->list->tail.prev; widget != NULL; widget=widget->prev) {
+                    if (widget->hidden) { continue;}
+                    widget->focussed = false;
+                    widget->highlight = false;
+                }
             }
         }
 
         visualizer_vumeter(vols);
-        Uint64 pc_1 = SDL_GetPerformanceCounter();
-        uint64_t ms_1 = get_micro_seconds();
+        uint64_t ms_2 = get_micro_seconds();
         SDL_RenderClear(app_context->renderer);
 
-        Uint64 pc_2 = SDL_GetPerformanceCounter();
-        uint64_t ms_2 = get_micro_seconds();
+        uint64_t ms_3 = get_micro_seconds();
 
         for(widget* widget=view->list->head.next; widget != NULL; widget=widget->next) {
             if (!widget->hidden) {
                 widget->render(widget);
             }
         }
+        uint64_t ms_4 = get_micro_seconds();
 
         SDL_RenderPresent(app_context->renderer);
         SDL_PumpEvents();
-        Uint64 pc_3 = SDL_GetPerformanceCounter();
-        uint64_t ms_3 = get_micro_seconds();
-        frame_perf_printf("\r%05.2f ms, %05.2f ms  %lu %lu %lu %lu %lu %lu                     ",
-               (1000.0 *(pc_2-pc_1))/SDL_GetPerformanceFrequency(),
-               (1000.0 *(pc_3-pc_1))/SDL_GetPerformanceFrequency(),
-               ms_2 - ms_1, ms_3 - ms_1, ms_3 - ms_0,
-               (pc_2-pc_1)/pfreq_micro_s,
-               (pc_3-pc_1)/pfreq_micro_s,
-               (pc_3-pc_0)/pfreq_micro_s
+        uint64_t ms_5 = get_micro_seconds();
+//        frame_perf_printf("\rfps=%02lu t=%06lu rs=%06lu v=%06lu rc=%06lu wr=%06lu rp=%06lu                    ",
+        frame_perf_printf("fps=%02lu t=%06lu rs=%06lu v=%06lu rc=%06lu wr=%06lu rp=%06lu\n",
+                1000000/(ms_5 - ms_0),
+                ms_5 - ms_0,
+                ms_1 - ms_0,
+                ms_2 - ms_1,
+                ms_3 - ms_2,
+                ms_4 - ms_3,
+                ms_5 - ms_4
                );
         ++iters;
 
-        if (app_context->delay) {
-            SDL_Delay(app_context->delay);
-        }
+//        if (app_context->delay) {
+//            SDL_Delay(app_context->delay);
+//        }
         if (iters >= app_context->max_iters) {
             debug_printf("*** iters=%d == max_iters%d ****\n");
             render_loop = false;
