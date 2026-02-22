@@ -205,6 +205,7 @@ static void release_texture(tcache_entry* tce) {
         SDL_DestroyTexture((SDL_Texture*)tce->texture);
         uint64_t ms_1 = get_micro_seconds();
         perf_printf("release_texture: destroy_texture: %07.2f millis\n", (float)(ms_1 - ms_0)/1000);
+        frame_perf_printf("release_texture: destroy_texture: %07.2f millis\n", (float)(ms_1 - ms_0)/1000);
         tce->texture = NULL;
         num_texture_bytes -= tce->num_bytes;
         tce->w = tce->h = tce->num_bytes = 0;
@@ -778,6 +779,7 @@ static int _tcache_resolve_textures(SDL_Renderer* renderer) {
             SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, tce->surface);
             uint64_t ms_ct_1 =get_micro_seconds();
             perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
+            frame_perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
             if (NULL == texture) {
                 error_printf("tcache_resolve_textures: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
                 SDL_ClearError();
