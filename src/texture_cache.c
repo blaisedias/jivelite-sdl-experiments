@@ -471,7 +471,10 @@ static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
     uint64_t ms_0 = get_micro_seconds();
     static tcache_entry* eject_tbl[HASHTPRIME];
     int ejected_count = 0;
+    uint64_t ms_ct_0 =get_micro_seconds();
     int count = lru_sort_tce(eject_tbl);
+    uint64_t ms_ct_1 =get_micro_seconds();
+    frame_perf_printf("lru_sort_tce %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
     for(int ix=0; ix < count && check(increment, ejected_count); ++ix) {
         tcache_entry* tce = eject_tbl[ix];
         if (!tce->locked && tce->texture) {
