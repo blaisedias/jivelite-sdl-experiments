@@ -18,7 +18,8 @@ extern void (*input_printf)(char *format, ...);
 extern void (*debug_printf)(char *format, ...);
 extern void (*tcache_printf)(char *format, ...);
 extern void (*tcache_eject_printf)(char *format, ...);
-extern void (*frame_perf_printf)(char *format, ...);
+extern void (*profile_printf)(char *format, ...);
+extern void (*profile_texture_printf)(char *format, ...);
 extern void (*json_printf)(char *format, ...);
 extern void (*action_printf)(char *format, ...);
 
@@ -30,7 +31,8 @@ typedef enum {
     SCALE_PRINTF,
     INPUT_PRINTF,
     TEXTURE_CACHE_PRINTF,
-    FRAME_PERF_PRINTF,
+    PROFILE_PERF_PRINTF,
+    PROFILE_TEXTURE_PERF_PRINTF,
     JSON_PRINTF,
     ACTION_PRINTF,
     TEXTURE_CACHE_EJECT_PRINTF,

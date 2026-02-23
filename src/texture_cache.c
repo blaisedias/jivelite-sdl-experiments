@@ -204,7 +204,8 @@ static void release_texture(tcache_entry* tce) {
         uint64_t ms_0 = get_micro_seconds();
         SDL_DestroyTexture((SDL_Texture*)tce->texture);
         uint64_t ms_1 = get_micro_seconds();
-        perf_printf("release_texture: destroy_texture: %07.2f millis\n", (float)(ms_1 - ms_0)/1000);
+//        perf_printf("release_texture: destroy_texture: %07.2f millis\n", (float)(ms_1 - ms_0)/1000);
+        profile_texture_printf("release_texture: destroy_texture: %06lu\n", ms_1 - ms_0);
         tce->texture = NULL;
         num_texture_bytes -= tce->num_bytes;
         tce->w = tce->h = tce->num_bytes = 0;
@@ -470,7 +471,10 @@ static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
     uint64_t ms_0 = get_micro_seconds();
     static tcache_entry* eject_tbl[HASHTPRIME];
     int ejected_count = 0;
+    uint64_t ms_ct_0 =get_micro_seconds();
     int count = lru_sort_tce(eject_tbl);
+    uint64_t ms_ct_1 =get_micro_seconds();
+    profile_texture_printf("tcache_eject: lru_sort_tcache: %06lu\n", ms_ct_1 - ms_ct_0);
     for(int ix=0; ix < count && check(increment, ejected_count); ++ix) {
         tcache_entry* tce = eject_tbl[ix];
         if (!tce->locked && tce->texture) {
@@ -777,7 +781,8 @@ static int _tcache_resolve_textures(SDL_Renderer* renderer) {
             uint64_t ms_ct_0 =get_micro_seconds();
             SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, tce->surface);
             uint64_t ms_ct_1 =get_micro_seconds();
-            perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
+//            perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
+            profile_texture_printf("texture_resolve: create_texture: %06lu\n", ms_ct_1 - ms_ct_0);
             if (NULL == texture) {
                 error_printf("tcache_resolve_textures: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
                 SDL_ClearError();

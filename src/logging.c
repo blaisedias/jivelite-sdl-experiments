@@ -38,7 +38,8 @@ void (*input_printf)(char *format, ...) = dummy_printf;
 void (*debug_printf)(char *format, ...) = dummy_printf;
 void (*tcache_printf)(char *format, ...) = dummy_printf;
 void (*tcache_eject_printf)(char *format, ...) = dummy_printf;
-void (*frame_perf_printf)(char *format, ...) = dummy_printf;
+void (*profile_printf)(char *format, ...) = dummy_printf;
+void (*profile_texture_printf)(char *format, ...) = dummy_printf;
 void (*json_printf)(char *format, ...) = dummy_printf;
 void (*action_printf)(char *format, ...) = dummy_printf;
 
@@ -69,8 +70,11 @@ void enable_printf(vu_printf_typ v) {
         case TEXTURE_CACHE_EJECT_PRINTF:
             tcache_eject_printf = logfprintf;
             break;
-        case FRAME_PERF_PRINTF:
-            frame_perf_printf = logfprintf;
+        case PROFILE_PERF_PRINTF:
+            profile_printf = logfprintf;
+            break;
+        case PROFILE_TEXTURE_PERF_PRINTF:
+            profile_texture_printf = logfprintf;
             break;
         case JSON_PRINTF:
             json_printf = logfprintf;
@@ -107,8 +111,11 @@ void disable_printf(vu_printf_typ v) {
         case TEXTURE_CACHE_EJECT_PRINTF:
             tcache_eject_printf = dummy_printf;
             break;
-        case FRAME_PERF_PRINTF:
-            frame_perf_printf = dummy_printf;
+        case PROFILE_PERF_PRINTF:
+            profile_printf = dummy_printf;
+            break;
+        case PROFILE_TEXTURE_PERF_PRINTF:
+            profile_texture_printf = dummy_printf;
             break;
         case JSON_PRINTF:
             json_printf = dummy_printf;
