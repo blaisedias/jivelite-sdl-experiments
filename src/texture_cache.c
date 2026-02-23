@@ -462,21 +462,28 @@ static bool cap_exceeded(int increment, int ejected) {
     return max_num_texture_bytes && (num_texture_bytes + increment) > max_num_texture_bytes;
 }
 
+static struct {
+    tcache_entry* tbl[HASHTPRIME];
+    int count;
+    int ix;
+} lru_eject;
+
 // Eject least recently used textures to reduce texture bytes to the configured limit
 // TODO: this potentially expensive function in terms of time is called within the
 // context of the renderer thread.
-// Devise a scheme where entires are marked for ejection in the context of other threads
+// Devise a scheme where entries are marked for ejection in the context of other threads
 // and the renderer thread merely performs the release.
 static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
     uint64_t ms_0 = get_micro_seconds();
-    static tcache_entry* eject_tbl[HASHTPRIME];
+//    static tcache_entry* eject_tbl[HASHTPRIME];
     int ejected_count = 0;
-    uint64_t ms_ct_0 =get_micro_seconds();
-    int count = lru_sort_tce(eject_tbl);
-    uint64_t ms_ct_1 =get_micro_seconds();
-    profile_texture_printf("tcache_eject: lru_sort_tcache: %06lu\n", ms_ct_1 - ms_ct_0);
-    for(int ix=0; ix < count && check(increment, ejected_count); ++ix) {
-        tcache_entry* tce = eject_tbl[ix];
+//    uint64_t ms_ct_0 = get_micro_seconds();
+//    int count = lru_sort_tce(eject_tbl);
+//    uint64_t ms_ct_1 = get_micro_seconds();
+//    profile_texture_printf("tcache_eject: lru_sort_tcache: %06lu\n", ms_ct_1 - ms_ct_0);
+//    for(int ix=0; ix < count && check(increment, ejected_count); ++ix) {
+    for(; lru_eject.ix < lru_eject.count && check(increment, ejected_count); ++lru_eject.ix) {
+        tcache_entry* tce = lru_eject.tbl[lru_eject.ix];
         if (!tce->locked && tce->texture) {
             release_texture(tce);
             tce->ejected = true;
@@ -484,8 +491,10 @@ static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
             tcache_eject_printf("tcache_eject: %s %d %u / %u\n", tce->path, increment, num_texture_bytes, max_num_texture_bytes);
         }
     }
+    assert(lru_eject.ix < lru_eject.count);
     uint64_t ms_1 = get_micro_seconds();
-    perf_printf("tcache_eject: %f millis\n", (float)(ms_1 - ms_0)/1000);
+    profile_texture_printf("tcache_eject: %06lu\n", ms_1- ms_0);
+//    perf_printf("tcache_eject: %f millis\n", (float)(ms_1 - ms_0)/1000);
     return ejected_count;
 }
 
@@ -764,6 +773,14 @@ static int _tcache_resolve_textures(SDL_Renderer* renderer) {
     if (resolution_req_counter == resolution_done_counter) {
         return resolved_count;
     }
+
+    // setup for lru cache ejection, this only needs to be done once
+    // for each texture resolution cycle
+    uint64_t ms_sort_0 = get_micro_seconds();
+    lru_eject.count = lru_sort_tce(lru_eject.tbl);
+    lru_eject.ix = 0;
+    uint64_t ms_sort_1 = get_micro_seconds();
+    profile_texture_printf("lru_sort_tcache: %06lu\n", ms_sort_1 - ms_sort_0);
 
     // Resolution is required:
     // BEFORE resolving, synchronise the request and donecounter values,
