@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
             .window = NULL,
             .max_iters = (Uint32)-1,
             .cycle_iters = (Uint32)-1,
-            .delay = 1
+            .delay = -1
         },
 //        .keystate = SDL_GetKeyboardState(NULL),
     };

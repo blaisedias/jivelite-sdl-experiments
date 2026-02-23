@@ -352,7 +352,9 @@ bool app_initialize(app_context* app_context, const char* window_title) {
         app_context->delay = MAX(app_context->delay, 1);
     }
     */
-    app_context->delay = app_context->frame_time_millis - 1;
+    if (app_context->delay < 0) {
+        app_context->delay = app_context->frame_time_millis - 1;
+    }
     return false;
 }
 
