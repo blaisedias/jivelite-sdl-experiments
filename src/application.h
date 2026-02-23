@@ -15,8 +15,8 @@ typedef struct {
 
     int             screen_width;
     int             screen_height;
-    int             max_iters;
-    int             cycle_iters;
+    int             max_secs;
+    int             cycle_secs;
     int             delay;
     bool            vsync;
 

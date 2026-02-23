@@ -15,13 +15,14 @@
 #include "timing.h"
 #include "texture_cache.h"
 
-#define HIDE_CURSOR_COUNT  300
+#define HIDE_CURSOR_COUNT  5
 #define IMAGE_FLAGS IMG_INIT_PNG
 
 static SDL_RendererFlags render_flags = SDL_RENDERER_ACCELERATED;
-static int hide_cursor_count = 0;
+static int show_cursor = 0;
 static bool input_loop = true;
 static bool render_loop = true;
+static uint32_t render_iters;
 
 void sdl_render_loop(view_context* view) {
     const app_context* app_context = view->app;
@@ -29,26 +30,18 @@ void sdl_render_loop(view_context* view) {
     int vols[2] = {0, 0};
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
     SDL_ShowCursor(SDL_DISABLE);
-    uint64_t pfreq_micro_s = SDL_GetPerformanceFrequency();
-    pfreq_micro_s /= 1000000;
-    Uint32 iters = 0;
+    printf("render_loop: delay=%d\n", app_context->delay);
 
-    uint64_t ms_0 = get_micro_seconds();
+    // ensure that ms_00 is set to immediately after return from
+    // SDL_RenderPresent with vsync set.
+    SDL_RenderClear(app_context->renderer);
+    SDL_RenderPresent(app_context->renderer);
+    uint64_t ms_00 = get_micro_seconds();
+
     while (render_loop) {
+        uint64_t ms_0 = get_micro_seconds();
         tcache_resolve_textures(app_context->renderer);
         uint64_t ms_1 = get_micro_seconds();
-        if (hide_cursor_count) {
-            if (0 >= --hide_cursor_count) {
-                SDL_ShowCursor(SDL_DISABLE);
-                hide_cursor_count = 0;
-                for(widget* widget=view->list->tail.prev; widget != NULL; widget=widget->prev) {
-                    if (widget->hidden) { continue;}
-                    widget->focussed = false;
-                    widget->highlight = false;
-                }
-            }
-        }
-
         visualizer_vumeter(vols);
         uint64_t ms_2 = get_micro_seconds();
         SDL_RenderClear(app_context->renderer);
@@ -63,36 +56,24 @@ void sdl_render_loop(view_context* view) {
         uint64_t ms_4 = get_micro_seconds();
 
         SDL_RenderPresent(app_context->renderer);
-        SDL_PumpEvents();
         uint64_t ms_5 = get_micro_seconds();
-        profile_printf("fps=%02lu t=%06lu rs=%06lu v=%06lu rc=%06lu wr=%06lu rp=%06lu\n",
-                1000000/(ms_5 - ms_0),
-                ms_5 - ms_0,
-                ms_1 - ms_0,
+        SDL_PumpEvents();
+//        profile_printf("fps=%02lu t=%06lu v=%06lu rt=%06lu wr=%06lu rtwr= rp=%06lu\n",
+        profile_printf("fps=%03lu t=%06lu v=%06lu rtwr=%06lu rp=%06lu\n",
+                1000000/(ms_5 - ms_00),
+                ms_5 - ms_00,
                 ms_2 - ms_1,
-                ms_3 - ms_2,
-                ms_4 - ms_3,
+                (ms_1 - ms_0) + (ms_4 - ms_3),
                 ms_5 - ms_4
                );
-        ++iters;
+        ++render_iters;
+        ms_00 = ms_5;
+
+//        SDL_ShowCursor(show_cursor != 0 ? SDL_ENABLE : SDL_DISABLE);
 
         if (app_context->delay) {
             SDL_Delay(app_context->delay);
         }
-
-        if (iters >= app_context->max_iters) {
-            debug_printf("*** iters=%d == max_iters%d ****\n");
-            render_loop = false;
-            input_loop = false;
-        }
-        if (iters % app_context->cycle_iters == 0) {
-            for(widget* t = view->list->head.next; t != NULL; t = t->next) {
-                if (t->type == WIDGET_VUMETER) {
-                    widget_vumeter_select_next(t);
-                }
-            }
-        }
-        ms_0 = get_micro_seconds();
     }
     debug_printf("*** render loop end ****\n");
 }
@@ -384,12 +365,12 @@ void print_app_runtime_info(app_context* app_context) {
     } else {
         printf("Failed to retrieve renderer information\n");
     }
-    printf("display:%dx%d Orientation:%f, calibrated delay:%d millisseconds, maxiters:%u performance freq:%lu\n",
+    printf("display:%dx%d Orientation:%f, calibrated delay:%d millisseconds, max seconds:%u performance freq:%lu\n",
            app_context->screen_width,
            app_context->screen_height,
            app_context->orientation,
            app_context->delay, 
-           app_context->max_iters,
+           app_context->max_secs,
            SDL_GetPerformanceFrequency());
 }
 
@@ -397,9 +378,11 @@ void sdl_input_loop(view_context* view) {
     const app_context* app_context = view->app;
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
     bool ignore_SDL_FINGER = 0 == start_touch_screen_event_generator(NULL);
-    SDL_ShowCursor(SDL_DISABLE);
+    uint32_t iters=0;
 
     while (input_loop) {
+        ++iters;
+        uint64_t t0 = get_micro_seconds();
         SDL_Event event;
         while(SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_FIRSTEVENT, SDL_LASTEVENT)) {
             switch (event.type) {
@@ -450,21 +433,21 @@ void sdl_input_loop(view_context* view) {
             case SDL_MOUSEMOTION:
                 {
                     SDL_ShowCursor(SDL_ENABLE);
-                    hide_cursor_count = HIDE_CURSOR_COUNT;
+                    show_cursor = HIDE_CURSOR_COUNT;
                     SDL_Point pt = {.x=event.button.x, .y=event.button.y};
                     widget_list_react(view->list, POINTER_MOTION, &pt);
                 } break;
             case SDL_MOUSEBUTTONDOWN:
                 {
                     SDL_ShowCursor(SDL_ENABLE);
-                    hide_cursor_count = HIDE_CURSOR_COUNT;
+                    show_cursor = HIDE_CURSOR_COUNT;
                     SDL_Point pt = {.x=event.button.x, .y=event.button.y};
                     widget_list_react(view->list, POINTER_DOWN, &pt);
                 } break;
             case SDL_MOUSEBUTTONUP:
                 {
                     SDL_ShowCursor(SDL_ENABLE);
-                    hide_cursor_count = HIDE_CURSOR_COUNT;
+                    show_cursor = HIDE_CURSOR_COUNT;
                     SDL_Point pt = {.x=event.button.x, .y=event.button.y};
                     widget_list_react(view->list, POINTER_UP, &pt);
                 } break;
@@ -520,8 +503,34 @@ void sdl_input_loop(view_context* view) {
                 break;
             }
         }
-//        SDL_Delay(100);
-        sleep_milli_seconds(100);
+        if (iters >= app_context->max_secs*10) {
+            printf("terminating: iterations=%d max_secs=%d frames rendered=%d\n",
+                   iters,
+                   app_context->max_secs,
+                   render_iters);
+            render_loop = false;
+            input_loop = false;
+        }
+        if (show_cursor) {
+            if (0 >= --show_cursor) {
+                SDL_ShowCursor(SDL_DISABLE);
+                show_cursor = 0;
+                for(widget* widget=view->list->tail.prev; widget != NULL; widget=widget->prev) {
+                    if (widget->hidden) { continue;}
+                    widget->focussed = false;
+                    widget->highlight = false;
+                }
+            }
+        }
+        // close to 100 milliseconds
+        if (iters % (app_context->cycle_secs*10) == 0) {
+            for(widget* t = view->list->head.next; t != NULL; t = t->next) {
+                if (t->type == WIDGET_VUMETER) {
+                    widget_vumeter_select_next(t);
+                }
+            }
+        }
+        sleep_micro_seconds(t0 + 100000 - get_micro_seconds());
     }
     stop_touch_screen_event_generator();
     debug_printf("*** input loop end ****\n");

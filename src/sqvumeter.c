@@ -21,8 +21,8 @@ const char* help_text=""
 "\n"  
 " - vsync : use vertical sync when rendering each frame\n"
 " - delay <seconds>  : delay between renders (if vsync not specified)\n"
-" - max_iters <count> : number of frames to render, before terminating, infinite if not specified\n"
-" - cycle_iters <count> : number of frames to render, before cycling the VU Meter\n"
+" - max_secs <count> : time to run before terminating, infinite if not specified\n"
+" - cycle <count> : number of seconds before cycling to the next the VU Meter\n"
 " - [0.0, 90.0, 180.0, 270.0] : rotation. Default is 0.0\n"
 "\n"  
 " - printfdefbug enable printing of debug\n"
@@ -78,8 +78,8 @@ int main(int argc, char **argv) {
         .context = {
             .renderer = NULL,
             .window = NULL,
-            .max_iters = (Uint32)-1,
-            .cycle_iters = (Uint32)-1,
+            .max_secs = (Uint32)-1,
+            .cycle_secs = (Uint32)-1,
             .delay = -1
         },
 //        .keystate = SDL_GetKeyboardState(NULL),
@@ -94,14 +94,14 @@ int main(int argc, char **argv) {
                 app.context.delay = atoi(argv[i+1]);
                 i += 1;
             }
-        } else if (0 == strcmp(argv[i], "max_iters")) {
+        } else if (0 == strcmp(argv[i], "max_secs")) {
             if (argc > i+1) {
-                app.context.max_iters = atoi(argv[i+1]);
+                app.context.max_secs = atoi(argv[i+1]);
                 i += 1;
             }
-        } else if (0 == strcmp(argv[i], "cycle_iters")) {
+        } else if (0 == strcmp(argv[i], "cycle")) {
             if (argc > i+1) {
-                app.context.cycle_iters = atoi(argv[i+1]);
+                app.context.cycle_secs = atoi(argv[i+1]);
                 i += 1;
             }
         } else if (0 == strcmp(argv[i], "wxh")) {

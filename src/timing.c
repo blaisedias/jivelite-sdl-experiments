@@ -23,6 +23,11 @@ uint64_t get_milli_seconds() {
 }
 
 void sleep_milli_seconds(unsigned millis) {
-    struct timespec ts = {.tv_sec =0, .tv_nsec = 1000*millis};
+    struct timespec ts = {.tv_sec =0, .tv_nsec = 1000000*millis};
+    nanosleep(&ts, NULL);
+}
+
+void sleep_micro_seconds(unsigned micros) {
+    struct timespec ts = {.tv_sec =0, .tv_nsec = 1000*micros};
     nanosleep(&ts, NULL);
 }
