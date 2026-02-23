@@ -822,10 +822,13 @@ int tcache_resolve_textures(SDL_Renderer* renderer) {
         return -1;
     }
     int rv = 0;
+    uint64_t ms_0 = get_micro_seconds();
     if (tcache_lock_try(&resolution_lock)) {
         rv = _tcache_resolve_textures(renderer);
         tcache_unlock(&resolution_lock);
     }
+    uint64_t ms_1 = get_micro_seconds();
+    profile_texture_printf("tcache_resolve_textures: %06lu\n", ms_1- ms_0);
     return rv;
 }
 
