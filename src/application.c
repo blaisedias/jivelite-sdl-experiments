@@ -33,8 +33,8 @@ void sdl_render_loop(view_context* view) {
     pfreq_micro_s /= 1000000;
     Uint32 iters = 0;
 
+    uint64_t ms_0 = get_micro_seconds();
     while (render_loop) {
-        uint64_t ms_0 = get_micro_seconds();
         tcache_resolve_textures(app_context->renderer);
         uint64_t ms_1 = get_micro_seconds();
         if (hide_cursor_count) {
@@ -92,6 +92,7 @@ void sdl_render_loop(view_context* view) {
                 }
             }
         }
+        ms_0 = get_micro_seconds();
     }
     debug_printf("*** render loop end ****\n");
 }

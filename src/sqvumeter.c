@@ -31,8 +31,8 @@ const char* help_text=""
 " - printfload   enable printing of media load times\n"
 " - printfscale  enable printing of scaling parameters and data\n"
 " - printfperf   enable printing of performance metrics\n"
-" - profile      enable printing of render loop performance metrics (per frame) including texture profile\n"
-" - profile_texture   enable printing of render loop texture performance metrics\n"
+" - profile      enable printing of render loop performance metrics (per frame)\n"
+" - profile_texture   enable printing of render loop texture metrics\n"
 " - printfjson   enable printing of json processing\n"
 " - printfaction enable printing of actions\n"
 " - printftcache enable printing of texture cache module\n"
@@ -136,7 +136,6 @@ int main(int argc, char **argv) {
             enable_printf(PERF_PRINTF);
         } else if (0 == strcmp(argv[i], "profile")) {
             enable_printf(PROFILE_PERF_PRINTF);
-            enable_printf(PROFILE_TEXTURE_PERF_PRINTF);
         } else if (0 == strcmp(argv[i], "profile_texture")) {
             enable_printf(PROFILE_TEXTURE_PERF_PRINTF);
          } else if (0 == strcmp(argv[i], "printfjson")) {
