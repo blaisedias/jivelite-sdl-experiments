@@ -18,6 +18,9 @@
 #include "timing.h"
 #include <assert.h>
 
+// TEMPORARY
+static SDL_Renderer* def_renderer;
+
 typedef struct tcache_entry tcache_entry;
 
 struct tcache_entry {
@@ -355,6 +358,20 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
 //        tcache_printf("tcache_quick_get_texture: %d %u %s\n", texture_id, tce->hashv, tce->path);
         recently_used(tce);
 
+        if (tce->texture == NULL && tce->surface != NULL) {
+            uint64_t ms_ct_0 =get_micro_seconds();
+            SDL_Texture* texture = SDL_CreateTextureFromSurface(def_renderer, tce->surface);
+            uint64_t ms_ct_1 =get_micro_seconds();
+//            perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
+            profile_texture_printf("texture_resolve: create_texture: %06lu\n", ms_ct_1 - ms_ct_0);
+            if (NULL == texture) {
+                error_printf("tcache_resolve_textures: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
+                SDL_ClearError();
+            }
+            update_texture(tce, texture);
+            SDL_FreeSurface(tce->surface);
+            tce->surface = NULL;
+        }
         // stored as a const - callers require a pointer which is not const
         return (SDL_Texture *)tce->texture;
     }
@@ -735,6 +752,21 @@ texture_id_t tcache_get_texture_id(const char* token) {
     return INVALID_TEXTURE_ID;
 }
 
+void prime_lru() {
+    // setup for lru cache ejection, this only needs to be done once
+    // for each texture resolution cycle
+    uint64_t ms_sort_0 = get_micro_seconds();
+    lru_eject.count = lru_sort_tce(lru_eject.tbl);
+    lru_eject.ix = 0;
+    uint64_t ms_sort_1 = get_micro_seconds();
+//    profile_texture_printf("lru_sort_tcache: %06lu\n", ms_sort_1 - ms_sort_0);
+}
+
+// TEMPORARY
+void set_def_renderer(SDL_Renderer* renderer) {
+    def_renderer = renderer;
+}
+
 static int _tcache_resolve_textures(SDL_Renderer* renderer) {
     uint64_t ms_0 = get_micro_seconds();
     int resolved_count = 0;
@@ -773,14 +805,6 @@ static int _tcache_resolve_textures(SDL_Renderer* renderer) {
     if (resolution_req_counter == resolution_done_counter) {
         return resolved_count;
     }
-
-    // setup for lru cache ejection, this only needs to be done once
-    // for each texture resolution cycle
-    uint64_t ms_sort_0 = get_micro_seconds();
-    lru_eject.count = lru_sort_tce(lru_eject.tbl);
-    lru_eject.ix = 0;
-    uint64_t ms_sort_1 = get_micro_seconds();
-    profile_texture_printf("lru_sort_tcache: %06lu\n", ms_sort_1 - ms_sort_0);
 
     // Resolution is required:
     // BEFORE resolving, synchronise the request and donecounter values,
