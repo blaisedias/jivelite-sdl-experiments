@@ -208,10 +208,10 @@ static void release_texture(tcache_entry* tce) {
         SDL_DestroyTexture((SDL_Texture*)tce->texture);
         uint64_t ms_1 = get_micro_seconds();
 //        perf_printf("release_texture: destroy_texture: %07.2f millis\n", (float)(ms_1 - ms_0)/1000);
-        profile_texture_printf("release_texture: destroy_texture: %06lu\n", ms_1 - ms_0);
         tce->texture = NULL;
         num_texture_bytes -= tce->num_bytes;
         tce->w = tce->h = tce->num_bytes = 0;
+        profile_texture_printf("release_texture: destroy_texture: %06lu %u/%u\n", ms_1 - ms_0, num_texture_bytes, max_num_texture_bytes);
         tcache_printf("release_texture: texture_bytes=%d\n", num_texture_bytes);
     }
 }
@@ -363,7 +363,6 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
             SDL_Texture* texture = SDL_CreateTextureFromSurface(def_renderer, tce->surface);
             uint64_t ms_ct_1 =get_micro_seconds();
 //            perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
-            profile_texture_printf("texture_resolve: create_texture: %06lu\n", ms_ct_1 - ms_ct_0);
             if (NULL == texture) {
                 error_printf("tcache_resolve_textures: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
                 SDL_ClearError();
@@ -371,6 +370,7 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
             update_texture(tce, texture);
             SDL_FreeSurface(tce->surface);
             tce->surface = NULL;
+            profile_texture_printf("texture_resolve: create_texture: %06lu us %u/%u\n", ms_ct_1 - ms_ct_0, num_texture_bytes, max_num_texture_bytes);
         }
         // stored as a const - callers require a pointer which is not const
         return (SDL_Texture *)tce->texture;
@@ -510,7 +510,7 @@ static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
     }
     assert(lru_eject.ix < lru_eject.count);
     uint64_t ms_1 = get_micro_seconds();
-    profile_texture_printf("tcache_eject: %06lu\n", ms_1- ms_0);
+    profile_texture_printf("tcache_eject: %06lu ejected %d\n", ms_1- ms_0, ejected_count);
 //    perf_printf("tcache_eject: %f millis\n", (float)(ms_1 - ms_0)/1000);
     return ejected_count;
 }
@@ -755,10 +755,10 @@ texture_id_t tcache_get_texture_id(const char* token) {
 void prime_lru() {
     // setup for lru cache ejection, this only needs to be done once
     // for each texture resolution cycle
-    uint64_t ms_sort_0 = get_micro_seconds();
+//    uint64_t ms_sort_0 = get_micro_seconds();
     lru_eject.count = lru_sort_tce(lru_eject.tbl);
     lru_eject.ix = 0;
-    uint64_t ms_sort_1 = get_micro_seconds();
+//    uint64_t ms_sort_1 = get_micro_seconds();
 //    profile_texture_printf("lru_sort_tcache: %06lu\n", ms_sort_1 - ms_sort_0);
 }
 
