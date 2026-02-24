@@ -18,9 +18,6 @@
 #include "timing.h"
 #include <assert.h>
 
-// TEMPORARY
-static SDL_Renderer* def_renderer;
-
 typedef struct tcache_entry tcache_entry;
 
 struct tcache_entry {
@@ -211,7 +208,7 @@ static void release_texture(tcache_entry* tce) {
         tce->texture = NULL;
         num_texture_bytes -= tce->num_bytes;
         tce->w = tce->h = tce->num_bytes = 0;
-        profile_texture_printf("release_texture: destroy_texture: %06lu %u/%u\n", ms_1 - ms_0, num_texture_bytes, max_num_texture_bytes);
+        profile_texture_printf("release_texture: destroy_texture: %06lu usec %u/%u\n", ms_1 - ms_0, num_texture_bytes, max_num_texture_bytes);
         tcache_printf("release_texture: texture_bytes=%d\n", num_texture_bytes);
     }
 }
@@ -311,7 +308,7 @@ texture_id_t tcache_create_entry(const char* path) {
 // texture_id*: quick access texture ID
 // returns: texture, NULL is the texture is not found
 //          texture ID or INVALID_TEXTURE_ID is texture is not found
-SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
+SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id, SDL_Renderer* renderer) {
     if (!check_permitted()) {
         return NULL;
     }
@@ -327,8 +324,7 @@ SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
             if (texture_id) {
                 *texture_id = indx;
             }
-            // stored as a const - callers require a pointer which is not const
-            return (SDL_Texture *)tce->texture;
+            return tcache_quick_get_texture(indx, renderer);
         }
         indx = (indx+COLLISION_STEP)%HASHTPRIME;
         tce = tbl[indx];
@@ -345,7 +341,7 @@ SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id) {
 // texture_id*: quick access texture ID
 // returns: texture, NULL is the texture is not found
 //          texture ID
-SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
+SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* renderer) {
     if (!check_permitted()) {
         return NULL;
     }
@@ -360,17 +356,17 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id) {
 
         if (tce->texture == NULL && tce->surface != NULL) {
             uint64_t ms_ct_0 =get_micro_seconds();
-            SDL_Texture* texture = SDL_CreateTextureFromSurface(def_renderer, tce->surface);
+            SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, tce->surface);
             uint64_t ms_ct_1 =get_micro_seconds();
 //            perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
             if (NULL == texture) {
-                error_printf("tcache_resolve_textures: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
+                error_printf("tcache_quick_get_texture: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
                 SDL_ClearError();
             }
             update_texture(tce, texture);
             SDL_FreeSurface(tce->surface);
             tce->surface = NULL;
-            profile_texture_printf("texture_resolve: create_texture: %06lu us %u/%u\n", ms_ct_1 - ms_ct_0, num_texture_bytes, max_num_texture_bytes);
+            profile_texture_printf("texture_resolve: create_texture: %06lu usec %u/%u\n", ms_ct_1 - ms_ct_0, num_texture_bytes, max_num_texture_bytes);
         }
         // stored as a const - callers require a pointer which is not const
         return (SDL_Texture *)tce->texture;
@@ -510,7 +506,7 @@ static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
     }
     assert(lru_eject.ix < lru_eject.count);
     uint64_t ms_1 = get_micro_seconds();
-    profile_texture_printf("tcache_eject: %06lu ejected %d\n", ms_1- ms_0, ejected_count);
+    profile_texture_printf("tcache_eject: %06lu usec ejected %d\n", ms_1- ms_0, ejected_count);
 //    perf_printf("tcache_eject: %f millis\n", (float)(ms_1 - ms_0)/1000);
     return ejected_count;
 }
@@ -762,11 +758,31 @@ void prime_lru() {
 //    profile_texture_printf("lru_sort_tcache: %06lu\n", ms_sort_1 - ms_sort_0);
 }
 
-// TEMPORARY
-void set_def_renderer(SDL_Renderer* renderer) {
-    def_renderer = renderer;
+void tcache_flush_textures(SDL_Renderer* renderer) {
+    // When an image is deleted the delete request counter is incremented
+    // When deletes are performed the delete done counter is synchronised with the req counter
+    // since *all* deletes are performed.
+    if (delete_req_counter != delete_done_counter) {
+        uint64_t ms_0 = get_micro_seconds();
+        // Delete is required:
+        // BEFORE deleting, synchronise the request and donecounter values,
+        // then if during resolution an image is deleted in another thread the counters will
+        // not be equal the next time this function is invoked and deletes will occur.
+        // An extra delete scan may be performed, that is deemed an acceptable trade-off.
+        delete_done_counter = delete_req_counter;
+        // texture_id 0 is the "unintialised" entry, skip it
+        for(texture_id_t texture_id=0+1; texture_id < HASHTPRIME; ++texture_id) {
+            tcache_entry* tce = tbl[texture_id];
+            if (tce && tce->delete) {
+                _delete_texture(texture_id);
+            }
+        }
+        uint64_t ms_1 = get_micro_seconds();
+        profile_texture_printf("texture_flush: %06lu usec\n", ms_1 - ms_0);
+    }
 }
 
+#if 0
 static int _tcache_resolve_textures(SDL_Renderer* renderer) {
     uint64_t ms_0 = get_micro_seconds();
     int resolved_count = 0;
@@ -855,6 +871,7 @@ int tcache_resolve_textures(SDL_Renderer* renderer) {
     profile_texture_printf("tcache_resolve_textures: %06lu\n", ms_1- ms_0);
     return rv;
 }
+#endif 
 
 // Get texture width and height 
 // texture_id*: quick access texture ID

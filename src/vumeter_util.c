@@ -407,7 +407,7 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
             vumeter_element *p = &vu->placements.elements[*bg];
             rebaseRect(enclosure, &p->rect, &render_rect);
             SDL_RenderCopyEx(renderer,
-                    tcache_quick_get_texture(vu->resources.textures[p->texture_index]),
+                    tcache_quick_get_texture(vu->resources.textures[p->texture_index], renderer),
                     NULL, &render_rect, vu->rotation, NULL, flip);
             ++bg;
         }
@@ -416,7 +416,7 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
 #define _RENDER_VOLUME_LEVEL_(value) \
         rebaseRect(enclosure, &vu->placements.elements[comp->placements[value]].rect, &render_rect); \
         SDL_RenderCopyEx(renderer,\
-        tcache_quick_get_texture(vu->resources.textures[vu->placements.elements[comp->placements[value]].texture_index]),\
+        tcache_quick_get_texture(vu->resources.textures[vu->placements.elements[comp->placements[value]].texture_index], renderer),\
         NULL,\
         &render_rect,\
         vu->rotation, NULL, flip)

@@ -77,7 +77,7 @@ static void button_widget_render(widget* wdgt) {
         copyRect(&wdgt->rect, &image_rect);
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(wdgt->sub.button.texture_id),
+                tcache_quick_get_texture(wdgt->sub.button.texture_id, wdgt->view->app->renderer),
                 NULL,
                 &image_rect, wdgt->view->app->orientation, NULL, flip);
     }
@@ -358,20 +358,20 @@ static void image_widget_render(widget* wdgt) {
     switch(wdgt->sub.image.scale_op) {
         case IMAGE_STRETCH_FILL:
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                   tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                   tcache_quick_get_texture(wdgt->sub.image.texture_id, wdgt->view->app->renderer),
                    NULL, &image_rect,
                    wdgt->view->app->orientation,
                    NULL, flip);
             break;
         case IMAGE_FIT:
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                   tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                   tcache_quick_get_texture(wdgt->sub.image.texture_id, wdgt->view->app->renderer),
                    NULL, &wdgt->sub.image.dst_rect,
                    wdgt->view->app->orientation, NULL, flip);
             break;
         case IMAGE_CENTRED_FILL:
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                    tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                    tcache_quick_get_texture(wdgt->sub.image.texture_id, wdgt->view->app->renderer),
                     &wdgt->sub.image.src_rect, &image_rect,
                     wdgt->view->app->orientation,
                     NULL, flip);
@@ -458,7 +458,7 @@ static void multistate_button_widget_render(widget* wdgt) {
         copyRect(&wdgt->rect, &image_rect);
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-            tcache_quick_get_texture(wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].texture_id),
+            tcache_quick_get_texture(wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].texture_id, wdgt->view->app->renderer),
             NULL, &image_rect,
             wdgt->view->app->orientation, NULL, flip);
     }
@@ -619,7 +619,7 @@ static void slider_widget_render(widget* wdgt) {
         if (bar_start) {
             int ix_texture = wk->current_pos > wk->min_pos? 1: 0;
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                   tcache_quick_get_texture(bar_start->texture_ids[ix_texture]),
+                   tcache_quick_get_texture(bar_start->texture_ids[ix_texture], wdgt->view->app->renderer),
                    NULL, &wk->bar_start_rect,
                    wdgt->view->app->orientation, NULL, flip);
         }
@@ -630,7 +630,7 @@ static void slider_widget_render(widget* wdgt) {
         if (bar_end) {
             int ix_texture = wk->current_pos < wk->max_pos? 0: 1;
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                   tcache_quick_get_texture(bar_end->texture_ids[ix_texture]),
+                   tcache_quick_get_texture(bar_end->texture_ids[ix_texture], wdgt->view->app->renderer),
                    NULL, &wk->bar_end_rect,
                    wdgt->view->app->orientation, NULL, flip);
         }
@@ -643,7 +643,7 @@ static void slider_widget_render(widget* wdgt) {
         image_rect.w = pick_rect.x - image_rect.x;
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(bar->texture_ids[0]),
+                tcache_quick_get_texture(bar->texture_ids[0], wdgt->view->app->renderer),
                 NULL, &image_rect,
                 wdgt->view->app->orientation, NULL, flip);
     }
@@ -653,7 +653,7 @@ static void slider_widget_render(widget* wdgt) {
         copyRect( &pick_rect, &image_rect);
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(pick->texture_ids[0]),
+                tcache_quick_get_texture(pick->texture_ids[0], wdgt->view->app->renderer),
                 NULL, &image_rect,
                 wdgt->view->app->orientation, NULL, flip);
     }
@@ -665,7 +665,7 @@ static void slider_widget_render(widget* wdgt) {
         image_rect.x = pick_rect.x + pick_rect.w;
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(bar->texture_ids[1]),
+                tcache_quick_get_texture(bar->texture_ids[1], wdgt->view->app->renderer),
                 NULL, &image_rect,
                 wdgt->view->app->orientation, NULL, flip);
     }

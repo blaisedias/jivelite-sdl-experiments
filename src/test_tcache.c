@@ -887,23 +887,23 @@ int main(int argc, const char** argv) {
         endoftest();
     }
 
-    {
-        startoftest("texture resolution");
-        int rc = tcache_resolve_textures(renderer);
-        if (rc == 0) {
-            printf("FAIL: No textures were resolved after loading\n");
-            exit(EXIT_FAILURE);
-        }
-        if (0 != tcache_resolve_textures(renderer)) {
-            printf("FAIL: All textures were NOT resolved!\n");
-            exit(EXIT_FAILURE);
-        }
-        if (pre_dump) {
-            printf("-Dump after resolution:\n");
-            tcache_dump();
-        }
-        endoftest();
-    }
+//    {
+//        startoftest("texture resolution");
+//        int rc = tcache_resolve_textures(renderer);
+//        if (rc == 0) {
+//            printf("FAIL: No textures were resolved after loading\n");
+//            exit(EXIT_FAILURE);
+//        }
+//        if (0 != tcache_resolve_textures(renderer)) {
+//            printf("FAIL: All textures were NOT resolved!\n");
+//            exit(EXIT_FAILURE);
+//        }
+//        if (pre_dump) {
+//            printf("-Dump after resolution:\n");
+//            tcache_dump();
+//        }
+//        endoftest();
+//    }
 
     {
         startoftest("texture get");
@@ -911,9 +911,9 @@ int main(int argc, const char** argv) {
         for(int ix=0; ix < num_images; ++ix) {
             texture_id_t texture_id;
             const SDL_Texture *texture1, *texture2;
-            texture1 = tcache_quick_get_texture(ids[ix]);
+            texture1 = tcache_quick_get_texture(ids[ix], renderer);
             sprintf(path_buff, "%s/%s", argv[1], pngs[ix]);
-            texture2 = tcache_get_texture(path_buff, &texture_id);
+            texture2 = tcache_get_texture(path_buff, &texture_id, renderer);
             if (texture1 != texture2) {
                 printf("FAIL: %d) texture mismatch %p %p, for %s\n", ix, texture1, texture2, pngs[ix]);
                 exit(EXIT_FAILURE);
@@ -967,7 +967,7 @@ int main(int argc, const char** argv) {
                 tcache_quick_delete_texture(ids[ix]);
             }
         }
-        tcache_resolve_textures(renderer);
+//        tcache_resolve_textures(renderer);
         if (verbose) {
             enable_printf(TEXTURE_CACHE_PRINTF);
             enable_printf(TEXTURE_CACHE_EJECT_PRINTF);
@@ -977,7 +977,7 @@ int main(int argc, const char** argv) {
             if (surface_loaded[ix]) {
                 const SDL_Texture *texture2;
                 if (tcache_test_lru_eject() ) {
-                    texture2 = tcache_quick_get_texture(ids[ix]);
+                    texture2 = tcache_quick_get_texture(ids[ix], renderer);
                     if (texture2) {
                         printf("FAIL: %d) texture LRU eject failed id=%d %p\n", ix, ids[ix], texture2);
                         exit(EXIT_FAILURE);
@@ -1029,7 +1029,7 @@ int main(int argc, const char** argv) {
         }
         startoftest("texture locking");
         loaded_images_count = load_test_images(renderer, path_prefix);
-        tcache_resolve_textures(renderer);
+//        tcache_resolve_textures(renderer);
         // simplify testing: remove entries with no associated images.
         // since no texture can be loaded for those images - we are
         // unable to test texture ejection on those images.
@@ -1054,7 +1054,7 @@ int main(int argc, const char** argv) {
             if(ix%2 != 0 && surface_loaded[ix]) {
                 const SDL_Texture *texture2;
                 if (tcache_test_lru_eject() ) {
-                    texture2 = tcache_quick_get_texture(ids[ix]);
+                    texture2 = tcache_quick_get_texture(ids[ix], renderer);
                     if (texture2) {
                         printf("FAIL: %d) texture LRU eject failed id=%d %p\n", ix, ids[ix], texture2);
                         exit(EXIT_FAILURE);
@@ -1075,7 +1075,7 @@ int main(int argc, const char** argv) {
                 const SDL_Texture *texture2;
                 if (tcache_test_lru_eject() ) {
                     printf("FAIL: %d) texture LRU was ejected? \n", ix);
-                    texture2 = tcache_quick_get_texture(ids[ix]);
+                    texture2 = tcache_quick_get_texture(ids[ix], renderer);
                     if (NULL == texture2) {
                         printf("FAIL: %d) texture LRU eject on locked image failed id=%d %p\n", ix, ids[ix], texture2);
                     }

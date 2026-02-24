@@ -32,8 +32,6 @@ void sdl_render_loop(view_context* view) {
     SDL_ShowCursor(SDL_DISABLE);
     printf("render_loop: delay=%d\n", app_context->delay);
 
-    // TEMPORARY
-    set_def_renderer(app_context->renderer);
     // ensure that ms_00 is set to immediately after return from
     // SDL_RenderPresent with vsync set.
     SDL_RenderClear(app_context->renderer);
@@ -43,6 +41,7 @@ void sdl_render_loop(view_context* view) {
     while (render_loop) {
         uint64_t ms_0 = get_micro_seconds();
         prime_lru();
+        tcache_flush_textures(app_context->renderer);
 //        tcache_resolve_textures(app_context->renderer);
         uint64_t ms_1 = get_micro_seconds();
         visualizer_vumeter(vols);

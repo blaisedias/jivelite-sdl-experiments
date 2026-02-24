@@ -9,9 +9,9 @@ void tcache_init(void);
 void tcache_set_renderer_tid(const SDL_threadID);
 
 // { These functions must be called in the thread that created the renderer
-int tcache_resolve_textures(SDL_Renderer* renderer);
-SDL_Texture* tcache_get_texture(const char* token, texture_id_t* texture_id);
-SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id);
+void tcache_flush_textures(SDL_Renderer* renderer);
+SDL_Texture* tcache_get_texture(const char* token, texture_id_t* texture_id, SDL_Renderer* renderer);
+SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* renderer);
 bool tcache_quick_get_texture_ejected(texture_id_t texture_id);
 
 // Test only function
@@ -35,8 +35,6 @@ bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h
 unsigned tcache_get_texture_bytes_count(void);
 void tcache_set_limit(unsigned);
 void prime_lru();
-// TEMPORARY
-void set_def_renderer(SDL_Renderer* renderer);
 
 // These functions can be called by any thread, but actions
 // may be deferred to the render thread.
