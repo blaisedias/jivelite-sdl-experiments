@@ -87,6 +87,10 @@ int main(int argc, char **argv) {
     view_context view = {.app = &app.context, .list=create_widget_list(&view)};
     bool dump_vu = false;
 
+    for(int i = 0; i < argc; ++i) {
+        printf("%s ", argv[i]);
+    }
+    printf("\n");
     for(int i = 1; i < argc; ++i) {
         if (0 == strcmp(argv[i], "max_secs")) {
             if (argc > i+1) {
