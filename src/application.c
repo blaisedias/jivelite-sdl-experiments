@@ -34,12 +34,12 @@ void sdl_render_loop(view_context* view) {
 
     // ensure that ms_00 is set to immediately after return from
     // SDL_RenderPresent with vsync set.
-    SDL_RenderSetVSync(app_context->renderer, 1);
+//    SDL_RenderSetVSync(app_context->renderer, 1);
     SDL_RenderClear(app_context->renderer);
     SDL_RenderPresent(app_context->renderer);
     uint64_t ms_00 = get_micro_seconds();
     uint64_t ms_next = ms_00 + app_context->frame_time_micros;
-    SDL_RenderSetVSync(app_context->renderer, app_context->vsync?1:0);
+//    SDL_RenderSetVSync(app_context->renderer, app_context->vsync);
 
     while (render_loop) {
         uint64_t ms_0 = get_micro_seconds();
@@ -60,7 +60,7 @@ void sdl_render_loop(view_context* view) {
         }
         uint64_t ms_4 = get_micro_seconds();
 
-        if (!app_context->vsync) {
+        if (app_context->vsync == 0) {
             sleep_micro_seconds(ms_next - get_micro_seconds());
         }
         SDL_RenderPresent(app_context->renderer);

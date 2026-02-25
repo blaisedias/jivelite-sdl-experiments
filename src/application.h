@@ -18,7 +18,7 @@ typedef struct {
     int             max_secs;
     int             cycle_secs;
     int             delay;
-    bool            vsync;
+    int             vsync;
 
     int             refresh_rate;
     int             frame_time_millis;

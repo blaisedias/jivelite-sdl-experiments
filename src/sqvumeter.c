@@ -80,7 +80,8 @@ int main(int argc, char **argv) {
             .window = NULL,
             .max_secs = (Uint32)-1,
             .cycle_secs = (Uint32)-1,
-            .delay = -1
+            .delay = -1,
+            .vsync = 0
         },
 //        .keystate = SDL_GetKeyboardState(NULL),
     };
@@ -111,7 +112,7 @@ int main(int argc, char **argv) {
                 i += 2;
             }
         } else if (0 == strcmp(argv[i], "vsync")) {
-            app.context.vsync = true;
+            app.context.vsync = 1;
         } else if (0 == strcmp(argv[i], "dumpvu")) {
             dump_vu = true;
         } else if (0 == strcmp(argv[i], "0.0")) {
