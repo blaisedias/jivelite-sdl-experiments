@@ -20,7 +20,6 @@ const char* help_text=""
 " - [help, -h, --h] : print this text and exit\n"
 "\n"  
 " - vsync : use vertical sync when rendering each frame\n"
-" - delay <seconds>  : delay between renders (if vsync not specified)\n"
 " - max_secs <count> : time to run before terminating, infinite if not specified\n"
 " - cycle <count> : number of seconds before cycling to the next the VU Meter\n"
 " - [0.0, 90.0, 180.0, 270.0] : rotation. Default is 0.0\n"
@@ -80,7 +79,6 @@ int main(int argc, char **argv) {
             .window = NULL,
             .max_secs = (Uint32)-1,
             .cycle_secs = (Uint32)-1,
-            .delay = -1,
             .vsync = 0
         },
 //        .keystate = SDL_GetKeyboardState(NULL),
@@ -90,12 +88,7 @@ int main(int argc, char **argv) {
     bool dump_vu = false;
 
     for(int i = 1; i < argc; ++i) {
-        if (0 == strcmp(argv[i], "delay")) {
-            if (argc > i+1) {
-                app.context.delay = atoi(argv[i+1]);
-                i += 1;
-            }
-        } else if (0 == strcmp(argv[i], "max_secs")) {
+        if (0 == strcmp(argv[i], "max_secs")) {
             if (argc > i+1) {
                 app.context.max_secs = atoi(argv[i+1]);
                 i += 1;

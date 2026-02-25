@@ -17,7 +17,6 @@ typedef struct {
     int             screen_height;
     int             max_secs;
     int             cycle_secs;
-    int             delay;
     int             vsync;
 
     int             refresh_rate;
