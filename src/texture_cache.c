@@ -21,8 +21,7 @@
 typedef struct tcache_entry tcache_entry;
 
 struct tcache_entry {
-    // value of 0 => inuse forever
-    int64_t             inuse_counter;
+    uint32_t            lru_count;
     const char*         path;
     uint32_t            hashv;
     const SDL_Texture*  texture;
@@ -56,13 +55,14 @@ static inline bool unoccupied_tce(tcache_entry* tce) {
     return tce == NULL || tce == tce_deleted;
 }
 
-int64_t global_inuse_counter = 1;
+// lru counter is 32 bits, and is incremented for every frame.
+// Only 31 bits are effective for comparisoin, MS bit is "set" if locked
+// rollover @60 Hz -> 67 years,  @120 Hz -> 33 years
+// so should be sufficient.
+static uint32_t lru_counter = 1;
 unsigned num_texture_bytes = 0;
 unsigned max_num_texture_bytes = 0;
-unsigned resolution_req_counter;
-unsigned resolution_done_counter;
-unsigned delete_req_counter;
-unsigned delete_done_counter;
+unsigned char delete_requested = 0;
 
 #define PRIME2K 2039
 #define PRIME4k 4093
@@ -81,23 +81,8 @@ static tcache_entry* tbl[NUM_TBL_ENTRIES];
 
 static SDL_threadID renderer_tid;
 
-static SDL_threadID resolution_lock = 0;
+static SDL_threadID delete_lock = 0;
 
-// lock implementation using atomic compare and exchange
-// The thread trying to acquire the lock "spins",
-// sleeping for 1 millisecond and trying again.
-static void tcache_lock(SDL_threadID* ptr) {
-    SDL_threadID expected = 0;
-    SDL_threadID desired = SDL_GetThreadID(NULL);
-    while (__atomic_compare_exchange (ptr, &expected, &desired, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED)) {
-        if (*ptr == desired) {
-            error_printf("recursive locking is unsupported\n");
-            // bug: state is uncertain terminate execution immediately
-            exit(EXIT_FAILURE);
-        }
-        sleep_milli_seconds(1);
-    }
-}
 // try acquire the spin lock, returns true if the lock was acquired,
 // false otherwise.
 static bool tcache_lock_try(SDL_threadID* ptr) {
@@ -105,7 +90,22 @@ static bool tcache_lock_try(SDL_threadID* ptr) {
     SDL_threadID desired = SDL_GetThreadID(NULL);
     return __atomic_compare_exchange (ptr, &expected, &desired, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
 }
-// release previously acquiree spin lock.
+
+// lock implementation using atomic compare and exchange
+// The thread trying to acquire the lock "spins",
+// sleeping for 1 millisecond and trying again.
+static void tcache_lock(SDL_threadID* ptr) {
+    while (!tcache_lock_try(ptr)) {
+        if (*ptr == SDL_GetThreadID(NULL)) {
+            error_printf("recursive locking is unsupported\n");
+            // bug: state is uncertain terminate execution immediately
+            exit(EXIT_FAILURE);
+        }
+        sleep_milli_seconds(1);
+    }
+}
+
+// release previously acquired spin lock.
 static void tcache_unlock(SDL_threadID* ptr) {
     SDL_threadID expected = SDL_GetThreadID(NULL);
     SDL_threadID desired = 0;
@@ -129,7 +129,7 @@ void tcache_set_renderer_tid(const SDL_threadID tid) {
 }
 
 // check for operations only permitted in the renderer thread context 
-bool check_permitted() {
+static inline bool check_permitted() {
     return SDL_GetThreadID(NULL) == renderer_tid;
 }
 
@@ -147,8 +147,14 @@ static int qs_tcache_partition(tcache_entry** tce_arr, int lo, int hi) {
     // temp pivot
     int i = lo-1;
     for (int j = lo; j < hi; j++) {
+        // set MSB if locked, since locked => newest always
+        // setting the MSB is sufficient for all practical purposes.
+        uint32_t effective_lru = tce_arr[j]->lru_count + tce_arr[j]->locked ? 1<<31: 0;
+        uint64_t pivot_effective_lru = pivot->lru_count + pivot->locked ? 1<<31: 0;
+
         // if the current element <= pivot 
-        if (tce_arr[j]->inuse_counter <= pivot->inuse_counter) {
+//        if (tce_arr[j]->lru_count <= pivot->lru_count) {
+        if (effective_lru < pivot_effective_lru) {
             // move temporary pivot index forward
             ++i;
             // swap current element with temporary pivot
@@ -189,14 +195,14 @@ static uint32_t hashfn(const char* token) {
     return CityHash32(token, strlen(token));
 }
 
-static void recently_used(tcache_entry* tce) {
-    if (tce) {
-        tce->inuse_counter = ++global_inuse_counter;
-//        tcache_printf("recently_used: tce=%p %ld %s\n", tce, tce->inuse_counter, tce->path);
-    } else {
-        error_printf("recently_used: tce=%p\n", tce);
-    }
-}
+//static inline void recently_used(tcache_entry* tce) {
+//    if (tce) {
+//        __atomic_store_n(&tce->lru_count, lru_counter, __ATOMIC_RELEASE);
+////        tcache_printf("recently_used: tce=%p %ld %s\n", tce, tce->lru_count, tce->path);
+//    } else {
+//        error_printf("recently_used: tce=%p\n", tce);
+//    }
+//}
 
 static void release_texture(tcache_entry* tce) {
     assert(external_tce(tce));
@@ -259,38 +265,44 @@ texture_id_t tcache_create_entry(const char* path) {
         tcache_entry* tce = *expected;
         // index 0 is reserved for client side uninitialised texture id
         if (indx) {
-            if (unoccupied_tce(tce) || (tce->hashv == hashv && 0 == compare_tce_paths(path,  tce->path))) {
-                if (unoccupied_tce(tce)) {
-                    tce = calloc(1, sizeof(*tce));
-                    if (tce == NULL) {
-                        error_printf("tcache_put_texture: Out of memory\n");
-                        exit(EXIT_FAILURE);
-                    }
-                    tce->path = strdup(path);
-                    tce->hashv = hashv;
-                    tcache_entry** ptr = tbl + indx;
-                    tcache_entry** desired = &tce;
-                    
-                    if (__atomic_compare_exchange (ptr, expected, desired, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED)) {
-                        tcache_printf("tcache_create_texture: new: tce=%p %d %s\n", tce, indx, tce->path);
-                        recently_used(tce);
-                        return indx;
-                    }
-                    free(tce);
-                    tce = NULL;
-                    if (0 == compare_tce_paths(path, (*expected)->path)) {
-                        // another thread has created the entry concurrently
-                        tce = *expected;
-                        recently_used(tce);
-                        return indx;
-                    }
-                    // another entry was added to the candidate slot continue searching for a free slot.
-                } else {
-                    tcache_printf("tcache_create_texture: found: tce=%p %d %s\n", tce, indx, tce->path);
-                    // entry was deleted - but deletion was incomplete - cancel pending deletion.
-                    tce->delete = false;
-                    recently_used(tce);
+            if (unoccupied_tce(tce)) {
+                tce = calloc(1, sizeof(*tce));
+                if (tce == NULL) {
+                    error_printf("tcache_put_texture: Out of memory\n");
+                    exit(EXIT_FAILURE);
+                }
+                tce->path = strdup(path);
+                tce->hashv = hashv;
+                __atomic_store_n(&tce->texture, NULL, __ATOMIC_RELEASE);
+                tcache_entry** ptr = tbl + indx;
+                tcache_entry** desired = &tce;
+                if (__atomic_compare_exchange (ptr, expected, desired, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED)) {
+                    tcache_printf("tcache_create_texture: new: tce=%p %d %s\n", tce, indx, tce->path);
                     return indx;
+                }
+                // unable to add the entry, release and try again
+                free(tce);
+                tce = NULL;
+                if (0 == compare_tce_paths(path, (*expected)->path)) {
+                    // another thread has created the entry concurrently
+                    tce = *expected;
+                    return indx;
+                }
+                // another entry was added to the candidate slot continue searching for a free slot.
+            } else {
+                if (tce->hashv == hashv && 0 == compare_tce_paths(path,  tce->path)) {
+                    tcache_lock(&delete_lock);
+                    if (unoccupied_tce(tce)) {
+                        // entry was deleted whilst acquiring the lock, probe the entry again
+                        --count;
+                    } else {
+                        tcache_printf("tcache_create_texture: found: tce=%p %d %s\n", tce, indx, tce->path);
+                        // ensure that the entry is not deleted
+                        tce->delete = false;
+                        tcache_unlock(&delete_lock);
+                        return indx;
+                    }
+                    tcache_unlock(&delete_lock);
                 }
             }
         }
@@ -319,8 +331,6 @@ SDL_Texture* tcache_get_texture(const char* path, texture_id_t* texture_id, SDL_
     for(int count=0; count < HASHTPRIME; ++count) {
         if (!unoccupied_tce(tce) && (tce->hashv == hashv && 0 == compare_tce_paths(path,  tce->path))) {
 //            tcache_printf("tcache_get_texture: OK: %s\n", tce->path);
-            recently_used(tce);
-
             if (texture_id) {
                 *texture_id = indx;
             }
@@ -352,7 +362,7 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* ren
     tcache_entry* tce = tbl[texture_id];
     if (!unoccupied_tce(tce)) {
 //        tcache_printf("tcache_quick_get_texture: %d %u %s\n", texture_id, tce->hashv, tce->path);
-        recently_used(tce);
+        __atomic_store_n(&tce->lru_count, lru_counter, __ATOMIC_RELEASE);
 
         if (tce->texture == NULL && tce->surface != NULL) {
             uint64_t ms_ct_0 =get_micro_seconds();
@@ -399,13 +409,13 @@ static void _delete_texture(texture_id_t texture_id) {
     tcache_entry* tce = tbl[texture_id];
     assert(external_tce(tce));
     if (external_tce(tce)) {
-        __atomic_store_n(tbl+texture_id, tce_deleted, __ATOMIC_RELEASE);
         tcache_printf("tcache_quick_delete_texture: %d %p\n", texture_id, tce);
         release_texture(tce);
         if (tce->path) {
             free((void *)tce->path);
         }
         free(tce);
+        __atomic_store_n(tbl+texture_id, tce_deleted, __ATOMIC_RELEASE);
     }
 }
 
@@ -422,14 +432,11 @@ bool tcache_quick_delete_texture(texture_id_t texture_id) {
         return true;
     }
     if (external_tce(tce)) {
-        if (check_permitted()) {
-            _delete_texture(texture_id);
-            return true;
-        } else {
-            tce->delete = true;
-            ++delete_req_counter;
-            return true;
-        }
+        tcache_lock(&delete_lock);
+        tce->delete = true;
+        __atomic_test_and_set(&delete_requested, __ATOMIC_ACQ_REL);
+        tcache_unlock(&delete_lock);
+        return true;
     } else {
         error_printf("tcache_quick_delete_texture: none: %d\n", texture_id);
     }
@@ -455,16 +462,18 @@ bool tcache_delete_texture(const char* path) {
         tce = tbl[indx];
     }
     return false;
-
 }
 
 static int lru_sort_tce(tcache_entry** lru_sorted_tbl) {
     int indx = 0;
     for(int ix=0; ix < HASHTPRIME; ++ix) {
-        tcache_entry* tce = tbl[ix];
-        if (external_tce(tce)) {
+        tcache_entry* tce =  __atomic_load_n(tbl +ix, __ATOMIC_ACQUIRE);
+        // candidates for ejection must have a texture
+        if (external_tce(tce) 
+                && 
+                __atomic_load_n(&tce->texture, __ATOMIC_ACQUIRE)) {
            lru_sorted_tbl[indx] = tce;
-            ++indx;
+           ++indx;
         }
     }
     quick_sort_tcache(lru_sorted_tbl, indx);
@@ -541,27 +550,29 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
         exit(EXIT_FAILURE);
     }
     tcache_entry* tce = tbl[texture_id];
-    // empty entry: behave like entries created by client.
+    // empty entry: with nothing to do, no file and texture is associated with this entry
     if (tce == &empty_tce) {
         return true;
     }
-    if (!unoccupied_tce(tce)) {
-        // Only load if not previously loaded
-        if (tce->texture == NULL) {
-           if (tce->surface == NULL) {
-                tcache_printf("tcache_load_from_file: : %d %s\n", texture_id, tce->path);
-                tce->surface = IMG_Load(tce->path);
-                if (tce->surface == NULL)  {
-                    error_printf("tcache_load_from_file: failed: %d %s\n", texture_id, tce->path);
-                } else {
-                    tce->w = tce->surface->w;
-                    tce->h = tce->surface->h;
-                    // signal texture resultion required
-                    ++resolution_req_counter;
-                }
-           }
+    tcache_lock(&delete_lock);
+    bool tce_is_valid = !unoccupied_tce(tce);
+    if (tce_is_valid) {
+        // prevent the entry from being deleted.
+        tce->delete = false;
+    }
+    tcache_unlock(&delete_lock);
+    if (tce_is_valid) {
+        // loading is only required if the associated texture or surface does not exist
+        if (tce->texture == NULL && tce->surface == NULL) {
+            tcache_printf("tcache_load_from_file: : %d %s\n", texture_id, tce->path);
+            tce->surface = IMG_Load(tce->path);
+            if (tce->surface == NULL)  {
+                error_printf("tcache_load_from_file: failed: %d %s\n", texture_id, tce->path);
+            } else {
+                tce->w = tce->surface->w;
+                tce->h = tce->surface->h;
+            }
         }
-        recently_used(tce);
         return tce->texture != NULL || tce->surface !=NULL; 
     }
     error_printf("tcache_load_from_file: invalid: %d\n", texture_id);
@@ -583,15 +594,7 @@ bool tcache_set_surface(texture_id_t texture_id, SDL_Surface* surface) {
             tce->surface = surface;
             return true;
         } else {
-            // previously set surface has not been resolved
-            // lock out resolution
-            tcache_lock(&resolution_lock);
-            // retrieve the previous surface 
-            SDL_Surface *obsolete = tce->surface;
-            // set the new surface
-            tce->surface = surface;
-            // release the lock
-            tcache_unlock(&resolution_lock);
+            SDL_Surface *obsolete = __atomic_exchange_n(&tce->surface, surface, __ATOMIC_ACQ_REL);
             if (obsolete) {
                 SDL_FreeSurface(obsolete);
             }
@@ -632,10 +635,10 @@ void tcache_dump() {
         for(int ix=0; ix < HASHTPRIME; ++ix) {
             tcache_entry* tce = tbl[ix];
             if (tce && tce != tce_deleted) {
-                printf("    %05d) delta=%4d hashv=%08x inuse=%016lx %s tce=%p surface:%p texture=%p w=%4d h=%4d bytes=%8d %s\n",
+                printf("    %05d) delta=%4d hashv=%08x inuse=%016x %s tce=%p surface:%p texture=%p w=%4d h=%4d bytes=%8d %s\n",
                        ix, ix - last_ix,
                        tce->hashv,
-                       tce->inuse_counter,
+                       tce->lru_count,
                        tce->locked ? "locked  ": "unlocked",
                        tce,
                        tce->surface,
@@ -665,9 +668,9 @@ void tcache_dump() {
         int64_t ejected_texture_bytes=0;
         for(int ix=0; ix < count; ++ix) {
             tcache_entry* tce = stbl[ix];
-                printf("    %5d) hashv=%08x inuse=%016lx %p %s\n", ix,
+                printf("    %5d) hashv=%08x inuse=%016x %p %s\n", ix,
                        tce->hashv,
-                       tce->inuse_counter,
+                       tce->lru_count,
                        tce,
                        tce->path);
                 if (tce->ejected) {
@@ -748,28 +751,26 @@ texture_id_t tcache_get_texture_id(const char* token) {
     return INVALID_TEXTURE_ID;
 }
 
-void prime_lru() {
-    // setup for lru cache ejection, this only needs to be done once
-    // for each texture resolution cycle
-//    uint64_t ms_sort_0 = get_micro_seconds();
-    lru_eject.count = lru_sort_tce(lru_eject.tbl);
-    lru_eject.ix = 0;
-//    uint64_t ms_sort_1 = get_micro_seconds();
-//    profile_texture_printf("lru_sort_tcache: %06lu\n", ms_sort_1 - ms_sort_0);
-}
-
-void tcache_flush_textures(SDL_Renderer* renderer) {
+static void _tcache_flush_textures(SDL_Renderer* renderer) {
     // When an image is deleted the delete request counter is incremented
     // When deletes are performed the delete done counter is synchronised with the req counter
     // since *all* deletes are performed.
-    if (delete_req_counter != delete_done_counter) {
+    if (delete_requested) {
+        // don't block on failure to acquire the lock, just return
+        if (!tcache_lock_try(&delete_lock)) {
+            return;
+        }
+
         uint64_t ms_0 = get_micro_seconds();
-        // Delete is required:
-        // BEFORE deleting, synchronise the request and donecounter values,
-        // then if during resolution an image is deleted in another thread the counters will
-        // not be equal the next time this function is invoked and deletes will occur.
-        // An extra delete scan may be performed, that is deemed an acceptable trade-off.
-        delete_done_counter = delete_req_counter;
+        // BEFORE deleting, clear the delete_requested flag,
+        // then if another thread requests a texture delete during the scan of cached entries
+        // for textures to delete:
+        // 1) if the cache entry has been scanned already it will be deleted in the next invocation
+        // of this function.
+        // OR
+        // 2) if the cache entry has not been scanned yet, the this loop may execute once more,
+        // with no actual work (to be) done.
+        __atomic_clear(&delete_requested, __ATOMIC_RELEASE);
         // texture_id 0 is the "unintialised" entry, skip it
         for(texture_id_t texture_id=0+1; texture_id < HASHTPRIME; ++texture_id) {
             tcache_entry* tce = tbl[texture_id];
@@ -779,99 +780,35 @@ void tcache_flush_textures(SDL_Renderer* renderer) {
         }
         uint64_t ms_1 = get_micro_seconds();
         profile_texture_printf("texture_flush: %06lu usec\n", ms_1 - ms_0);
+
+        tcache_unlock(&delete_lock);
     }
 }
 
-#if 0
-static int _tcache_resolve_textures(SDL_Renderer* renderer) {
-    uint64_t ms_0 = get_micro_seconds();
-    int resolved_count = 0;
-    tcache_init();
+void tcache_flush_textures(SDL_Renderer* renderer) {
     if (!check_permitted()) {
-        return resolved_count;
+        return;
     }
-
-    // Do deletes before loading surfaces into textures.
-
-    // When an image is deleted the delete request counter is incremented
-    // When deletes are performed the delete done counter is synchronised with the req counter
-    // since *all* deletes are performed.
-    if (delete_req_counter != delete_done_counter) {
-        // Delete is required:
-        // BEFORE deleting, synchronise the request and donecounter values,
-        // then if during resolution an image is deleted in another thread the counters will
-        // not be equal the next time this function is invoked and deletes will occur.
-        // An extra delete scan may be performed, that is deemed an acceptable trade-off.
-        delete_done_counter = delete_req_counter;
-        // texture_id 0 is the "unintialised" entry, skip it
-        for(texture_id_t texture_id=0+1; texture_id < HASHTPRIME; ++texture_id) {
-            tcache_entry* tce = tbl[texture_id];
-            if (tce && tce->delete) {
-                _delete_texture(texture_id);
-                ++resolved_count;
-            }
-        }
-        uint64_t ms_1 = get_micro_seconds();
-        perf_printf("\ntexture_resolve: delete: %5.2f millis\n", (float)(ms_1 - ms_0)/1000);
-    }
-
-    // When an image is loaded into a surface the request counter is incremented
-    // When resolution is performed the done counter is synchronised with the req counter
-    // since *all* resolutions are performed.
-    if (resolution_req_counter == resolution_done_counter) {
-        return resolved_count;
-    }
-
-    // Resolution is required:
-    // BEFORE resolving, synchronise the request and donecounter values,
-    // then if during resolution an image is loaded by another thread the counters will
-    // not be equal the next time this function is invoked and resolution will occur.
-    // An extra resolution scan may be performed, that is deemed an acceptable trade-off.
-    resolution_done_counter = resolution_req_counter;
-    // texture_id 0 is the "unintialised" entry, skip it
-    for(texture_id_t texture_id=0+1; texture_id < HASHTPRIME; ++texture_id) {
-        tcache_entry* tce = tbl[texture_id];
-        if (tce && tce->surface != NULL) {
-            if (tce->texture) {
-                release_texture(tce);
-            }
-            uint64_t ms_ct_0 =get_micro_seconds();
-            SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, tce->surface);
-            uint64_t ms_ct_1 =get_micro_seconds();
-//            perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
-            profile_texture_printf("texture_resolve: create_texture: %06lu\n", ms_ct_1 - ms_ct_0);
-            if (NULL == texture) {
-                error_printf("tcache_resolve_textures: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
-                SDL_ClearError();
-            }
-            update_texture(tce, texture);
-            SDL_FreeSurface(tce->surface);
-            tce->surface = NULL;
-            ++resolved_count;
-        }
-    }
-    uint64_t ms_1 = get_micro_seconds();
-    perf_printf("texture_resolve: %07.2f millis\n", (float)(ms_1 - ms_0)/1000);
-    return resolved_count;
+    _tcache_flush_textures(renderer);
 }
 
-// resolve surfaces into textures, can only be invoked in the 
-// context of the renderer thread.
-int tcache_resolve_textures(SDL_Renderer* renderer) {
+// texture cache prep for render must be called by the render thread,
+// before each frame render.
+void tcache_render_prep(SDL_Renderer* renderer) {
     if (!check_permitted()) {
-        return -1;
+        return;
     }
-    int rv = 0;
-    uint64_t ms_0 = get_micro_seconds();
-    if (tcache_lock_try(&resolution_lock)) {
-        rv = _tcache_resolve_textures(renderer);
-        tcache_unlock(&resolution_lock);
-    }
-    uint64_t ms_1 = get_micro_seconds();
-    profile_texture_printf("tcache_resolve_textures: %06lu\n", ms_1- ms_0);
-    return rv;
+    _tcache_flush_textures(renderer);
+   
+    // bump the LRU counter
+    __atomic_add_fetch(&lru_counter, 1, __ATOMIC_ACQ_REL);
+    // setup for lru cache ejection,
+//    uint64_t ms_sort_0 = get_micro_seconds();
+    lru_eject.count = lru_sort_tce(lru_eject.tbl);
+    lru_eject.ix = 0;
+//    uint64_t ms_sort_1 = get_micro_seconds();
+//    profile_texture_printf("lru_sort_tcache: %06lu\n", ms_sort_1 - ms_sort_0);
 }
-#endif 
 
 // Get texture width and height 
 // texture_id*: quick access texture ID

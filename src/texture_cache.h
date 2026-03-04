@@ -13,6 +13,7 @@ void tcache_flush_textures(SDL_Renderer* renderer);
 SDL_Texture* tcache_get_texture(const char* token, texture_id_t* texture_id, SDL_Renderer* renderer);
 SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* renderer);
 bool tcache_quick_get_texture_ejected(texture_id_t texture_id);
+void tcache_render_prep(SDL_Renderer* renderer);
 
 // Test only function
 bool tcache_test_lru_eject();
@@ -34,7 +35,6 @@ bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h
 
 unsigned tcache_get_texture_bytes_count(void);
 void tcache_set_limit(unsigned);
-void prime_lru();
 
 // These functions can be called by any thread, but actions
 // may be deferred to the render thread.

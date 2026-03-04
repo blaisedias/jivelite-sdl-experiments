@@ -28,6 +28,9 @@ ifeq ($(PLATFORM),piCorePlayer)
 else
 	INCLUDE_TSLIB =
 	TS_LIB_H = 
+#	gcc -fsanitize=address -fno-omit-frame-pointer -g -O1 -o
+	TARG_DEFS = -fno-omit-frame-pointer -g -O1 -fsanitize=thread
+#	TARG_DEFS = -fno-omit-frame-pointer -g -O1
 endif
 
 DEFS = $(TARG_DEFS)

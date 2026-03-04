@@ -21,7 +21,7 @@
 static SDL_RendererFlags render_flags = SDL_RENDERER_ACCELERATED;
 static int show_cursor = 0;
 static bool input_loop = true;
-static bool render_loop = true;
+static volatile bool render_loop = true;
 static uint32_t render_iters;
 
 void sdl_render_loop(view_context* view) {
@@ -42,8 +42,8 @@ void sdl_render_loop(view_context* view) {
 
     while (render_loop) {
         uint64_t ms_0 = get_micro_seconds();
-        prime_lru();
-        tcache_flush_textures(app_context->renderer);
+        tcache_render_prep(app_context->renderer);
+//        tcache_flush_textures(app_context->renderer);
 //        tcache_resolve_textures(app_context->renderer);
         uint64_t ms_1 = get_micro_seconds();
         visualizer_vumeter(vols);
@@ -445,7 +445,7 @@ void sdl_input_loop(view_context* view) {
                 for(widget* widget=view->list->tail.prev; widget != NULL; widget=widget->prev) {
                     if (widget->hidden) { continue;}
                     widget->focussed = false;
-                    widget->highlight = false;
+                    widget_set_highlight(widget, false);
                 }
             }
         }

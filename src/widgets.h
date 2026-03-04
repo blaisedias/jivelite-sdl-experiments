@@ -100,7 +100,8 @@ struct widget {
     action         action;
     void        (*render)(struct widget*);
     bool        focussed;
-    bool        highlight;
+    // 
+    bool        atomic_highlight;
     bool        hidden;
     bool        hotspot;
     const bool  focus_disabled;
@@ -118,7 +119,7 @@ struct widget {
     // 2 - for unrotated operations like DrawRect, FillRect
     //SDL_Rect    draw_rect;
 
-    bool         pressed;
+    bool         atomic_pressed;
 
     union {
         vumeter_widget* vu;
@@ -150,6 +151,23 @@ struct widget {
         }slider;
     }sub;
 };
+
+inline bool widget_highlight(widget* wdgt) {
+    return  __atomic_load_n(&wdgt->atomic_highlight, __ATOMIC_ACQUIRE);
+}
+
+inline void widget_set_highlight(widget* wdgt, bool onoff) {
+     __atomic_store_n(&wdgt->atomic_highlight, onoff, __ATOMIC_RELEASE);
+}
+
+inline bool widget_pressed(widget* wdgt) {
+    return  __atomic_load_n(&wdgt->atomic_pressed, __ATOMIC_ACQUIRE);
+}
+
+inline void widget_set_pressed(widget* wdgt, bool onoff) {
+     __atomic_store_n(&wdgt->atomic_pressed, onoff, __ATOMIC_RELEASE);
+}
+
 
 extern bool show_rects;
 extern bool show_input_rects;

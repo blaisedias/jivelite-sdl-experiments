@@ -58,7 +58,7 @@ void _show_input_rect(widget* wdgt) {
 }
 
 static void button_widget_render(widget* wdgt) {
-    if (wdgt->pressed && !wdgt->hotspot) {
+    if (widget_pressed(wdgt)&& !wdgt->hotspot) {
         SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
@@ -66,13 +66,13 @@ static void button_widget_render(widget* wdgt) {
         SDL_RenderFillRect(wdgt->view->app->renderer, &draw_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
-    if (wdgt->highlight && wdgt->hotspot == false && show_rects) {
+    if (widget_highlight(wdgt) && wdgt->hotspot == false && show_rects) {
         _show_draw_rect(wdgt);
     }
-    if (wdgt->highlight && show_input_rects) {
+    if (widget_highlight(wdgt) && show_input_rects) {
         _show_input_rect(wdgt);
     }
-    if (wdgt->hotspot == false || wdgt->highlight)  {
+    if (wdgt->hotspot == false || widget_highlight(wdgt))  {
         SDL_Rect image_rect;
         copyRect(&wdgt->rect, &image_rect);
         translate_image_rect(&image_rect);
@@ -347,7 +347,7 @@ widget* widget_create_button(const view_context* view) {
 }
 
 static void image_widget_render(widget* wdgt) {
-    if (wdgt->highlight) {
+    if (widget_highlight(wdgt)) {
         if (show_rects) { _show_draw_rect(wdgt); }
         if (show_input_rects) { _show_input_rect(wdgt); }
     }
@@ -439,7 +439,7 @@ widget* widget_hotspot_edge(widget* wdgt, hotspot_edge edge, SDL_Rect *r) {
 }
 
 static void multistate_button_widget_render(widget* wdgt) {
-    if (wdgt->pressed && !wdgt->hotspot) {
+    if (widget_pressed(wdgt) && !wdgt->hotspot) {
     SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
@@ -447,13 +447,13 @@ static void multistate_button_widget_render(widget* wdgt) {
         SDL_RenderFillRect(wdgt->view->app->renderer, &draw_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
-    if (wdgt->highlight && wdgt->hotspot == false && show_rects) {
+    if (widget_highlight(wdgt) && wdgt->hotspot == false && show_rects) {
         _show_draw_rect(wdgt);
     }
-    if (wdgt->highlight && show_input_rects) {
+    if (widget_highlight(wdgt) && show_input_rects) {
         _show_input_rect(wdgt);
     }
-    if (wdgt->hotspot == false || wdgt->highlight)  {
+    if (wdgt->hotspot == false || widget_highlight(wdgt))  {
         SDL_Rect image_rect;
         copyRect(&wdgt->rect, &image_rect);
         translate_image_rect(&image_rect);
@@ -591,7 +591,7 @@ static _slider_workspace* slider_widget_init_workspace(widget* wdgt) {
 }
 
 static void slider_widget_render(widget* wdgt) {
-    if (wdgt->highlight) {
+    if (widget_highlight(wdgt)) {
         if (show_rects) { _show_draw_rect(wdgt); }
         if (show_input_rects) { _show_input_rect(wdgt); }
     }
@@ -606,7 +606,7 @@ static void slider_widget_render(widget* wdgt) {
     SDL_Rect pick_rect;
     copyRect(&wdgt->rect, &pick_rect);
     if (wk->value_range_delta > 0) {
-        if (wdgt->pressed) {
+        if (widget_pressed(wdgt)) {
             pick_rect.x = wk->drag_pos - wk->half_pw;
         } else {
             pick_rect.x = wk->current_pos - wk->half_pw;
@@ -756,7 +756,7 @@ widget *widget_slider_image_height(widget* wdgt, slider_resource_ID id, int heig
 }
 
 static widget *widget_slider_track(widget* wdgt, const SDL_Point *pt) {
-    if (wdgt->pressed && (wdgt->sub.slider.range.end - wdgt->sub.slider.range.start) > 0) {
+    if (widget_pressed(wdgt) && (wdgt->sub.slider.range.end - wdgt->sub.slider.range.start) > 0) {
         _slider_resource* pick = wdgt->sub.slider.res+SLIDER_PICK;
         _slider_workspace* wk = &wdgt->sub.slider.wk;
         if (pick) {
@@ -894,23 +894,23 @@ void widget_list_react(const widget_list* list, const pointer_input input, SDL_P
                 if (widget->hidden) { continue;}
                 if (!selected) {
                     widget->focussed = SDL_PointInRect(pt, &widget->input_rect) && (!widget->focus_disabled);
-                    widget->highlight = widget->focussed;
-                    widget->pressed = widget->focussed;
+                    widget_set_highlight(widget, widget->focussed);
+                    widget_set_pressed(widget, widget->focussed);
                     selected = widget->focussed;
                     if (widget->type == WIDGET_SLIDER) {
                         widget_slider_track(widget, pt);
                     }
                 } else {
                     widget->focussed = false;
-                    widget->highlight = false;
-                    widget->pressed = false;
+                    widget_set_highlight(widget, false);
+                    widget_set_pressed(widget, false);
                 }
             }
             break;
         case POINTER_UP:
             for(widget* widget=list->tail.prev; widget != NULL; widget=widget->prev) {
                 if (widget->hidden) { continue;}
-                widget->pressed = false;
+                widget_set_pressed(widget, false);
                 if (SDL_PointInRect(pt, &widget->input_rect) && widget->focussed) {
                    input_printf("HIT: {%04d,%04d} {%04d,%04d} %p\n",
                                 widget->input_rect.x, widget->input_rect.y,
@@ -919,7 +919,7 @@ void widget_list_react(const widget_list* list, const pointer_input input, SDL_P
                                 widget
                                 );
                     widget->focussed = false;
-                    widget->highlight = widget->focussed;
+                    widget_set_highlight(widget, widget->focussed);
                     if (widget->type == WIDGET_SLIDER) {
                         widget_slider_tracking_commit(widget, pt);
                         int value =  -987654321;
@@ -929,7 +929,7 @@ void widget_list_react(const widget_list* list, const pointer_input input, SDL_P
                     widget_dispatch_action(widget);
                 } else {
                     widget->focussed = false;
-                    widget->highlight = false;
+                    widget_set_highlight(widget, false);
                 }
             }
             break;
@@ -937,15 +937,15 @@ void widget_list_react(const widget_list* list, const pointer_input input, SDL_P
             for (widget* widget=list->tail.prev; widget != NULL; widget=widget->prev) {
                 if (widget->hidden) { continue;}
                 if (!selected) {
-                    widget->highlight = SDL_PointInRect(pt, &widget->input_rect) && (!widget->focus_disabled);
-                    selected = widget->highlight;
+                    widget_set_highlight(widget, SDL_PointInRect(pt, &widget->input_rect) && (!widget->focus_disabled));
+                    selected = widget_highlight(widget);
                     if (selected) {
                         if (widget->type == WIDGET_SLIDER) {
                             widget_slider_track(widget, pt);
                         }
                     }
                 } else {
-                    widget->highlight = false;
+                    widget_set_highlight(widget, false);
                 }
             }
             break;

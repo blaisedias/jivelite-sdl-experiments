@@ -450,8 +450,8 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
                     }break;
                 case AGGREGATE:
                     {
-                        int vol;
-                        int peak_vol;
+                        int vol = 0;
+                        int peak_vol = 0;
                         switch(comp->peak) {
                             case PEAK_NONE:
                                 vol = runtime->vol;

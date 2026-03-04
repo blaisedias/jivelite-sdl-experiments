@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
         debug_printf(" %s\n", widget_type_name(widget->type));
         debug_printf("     foc=%d highlight=%d hidden=%d hotspot=%d %s\n",
                 (int)widget->focussed,
-                (int)widget->highlight,
+                (int)widget_highlight(widget),
                 (int)widget->hidden,
                 (int)widget->hotspot,
                 widget->image_path
