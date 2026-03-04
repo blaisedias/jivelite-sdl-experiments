@@ -25,6 +25,23 @@ static char* widget_type_strings[] = {
     "none"
 };
 
+bool widget_highlight(widget* wdgt) {
+    return  __atomic_load_n(&wdgt->atomic_highlight, __ATOMIC_ACQUIRE);
+}
+
+void widget_set_highlight(widget* wdgt, bool onoff) {
+     __atomic_store_n(&wdgt->atomic_highlight, onoff, __ATOMIC_RELEASE);
+}
+
+bool widget_pressed(widget* wdgt) {
+    return  __atomic_load_n(&wdgt->atomic_pressed, __ATOMIC_ACQUIRE);
+}
+
+void widget_set_pressed(widget* wdgt, bool onoff) {
+     __atomic_store_n(&wdgt->atomic_pressed, onoff, __ATOMIC_RELEASE);
+}
+
+
 const char* widget_type_name(widget_type typ) {
     if (typ >= WIDGET_NONE && typ <= WIDGET_END) {
         return widget_type_strings[typ];

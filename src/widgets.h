@@ -152,21 +152,10 @@ struct widget {
     }sub;
 };
 
-inline bool widget_highlight(widget* wdgt) {
-    return  __atomic_load_n(&wdgt->atomic_highlight, __ATOMIC_ACQUIRE);
-}
-
-inline void widget_set_highlight(widget* wdgt, bool onoff) {
-     __atomic_store_n(&wdgt->atomic_highlight, onoff, __ATOMIC_RELEASE);
-}
-
-inline bool widget_pressed(widget* wdgt) {
-    return  __atomic_load_n(&wdgt->atomic_pressed, __ATOMIC_ACQUIRE);
-}
-
-inline void widget_set_pressed(widget* wdgt, bool onoff) {
-     __atomic_store_n(&wdgt->atomic_pressed, onoff, __ATOMIC_RELEASE);
-}
+bool widget_highlight(widget* wdgt); 
+void widget_set_highlight(widget* wdgt, bool onoff);
+bool widget_pressed(widget* wdgt);
+void widget_set_pressed(widget* wdgt, bool onoff);
 
 
 extern bool show_rects;
