@@ -32,11 +32,11 @@ struct vumeter_widget {
     bool locked;
 };
 
-inline int vumeter_index(vumeter_widget* wdgt) {
+static inline int vumeter_index(vumeter_widget* wdgt) {
     return  __atomic_load_n(&wdgt->atomic_meter_indx, __ATOMIC_ACQUIRE);
 }
 
-inline void vumeter_set_index(vumeter_widget* wdgt, int ix) {
+static inline void vumeter_set_index(vumeter_widget* wdgt, int ix) {
      __atomic_store_n(&wdgt->atomic_meter_indx, ix, __ATOMIC_RELEASE);
 }
 
