@@ -26,6 +26,7 @@ static uint32_t render_iters;
 
 void sdl_render_loop(view_context* view) {
     const app_context* app_context = view->app;
+    bool profile_fps_deviation = app_context->profile_fps_deviation;
     SDL_RenderClear(app_context->renderer);
     int vols[2] = {0, 0};
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
@@ -69,7 +70,7 @@ void sdl_render_loop(view_context* view) {
         uint64_t ms_7 = get_micro_seconds();
 //        profile_printf("fps=%02lu t=%06lu v=%06lu rt=%06lu wr=%06lu rtwr= rp=%06lu\n",
         uint64_t fps = 1000000/(ms_6 - ms_00);
-//        if (fps < 59 || fps > 61) {
+        if ( !profile_fps_deviation || (fps < 59 || fps > 61)) {
         profile_printf("fps=%03lu t=%06lu pr=%06lu v=%06lu rc=%06lu wr=%06lu s=%06lu rp=%06lu pe=%06lu off=%06lu\n",
                 fps,
                 ms_6 - ms_00,
@@ -82,7 +83,7 @@ void sdl_render_loop(view_context* view) {
                 ms_7 - ms_6,
                 ms_5 - ms_next
                );
- //       }
+        }
         ++render_iters;
         ms_00 = ms_6;
         ms_next += app_context->frame_time_micros;

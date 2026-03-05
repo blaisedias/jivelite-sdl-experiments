@@ -22,6 +22,8 @@ typedef struct {
     int             refresh_rate;
     int             frame_time_millis;
     int             frame_time_micros;
+
+    bool            profile_fps_deviation;
 } app_context;
 
 #endif // __jl_application_h_

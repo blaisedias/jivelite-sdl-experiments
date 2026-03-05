@@ -31,6 +31,7 @@ const char* help_text=""
 " - printfscale  enable printing of scaling parameters and data\n"
 " - printfperf   enable printing of performance metrics\n"
 " - profile      enable printing of render loop performance metrics (per frame)\n"
+" - profile_fps_deviation      enable printing of render loop performance metrics (per frame) when fps has deviated\n"
 " - profile_texture   enable printing of render loop texture metrics\n"
 " - printfjson   enable printing of json processing\n"
 " - printfaction enable printing of actions\n"
@@ -134,7 +135,10 @@ int main(int argc, char **argv) {
             enable_printf(PERF_PRINTF);
         } else if (0 == strcmp(argv[i], "profile")) {
             enable_printf(PROFILE_PERF_PRINTF);
-        } else if (0 == strcmp(argv[i], "profile_texture")) {
+        } else if (0 == strcmp(argv[i], "profile_fps_deviation")) {
+            enable_printf(PROFILE_PERF_PRINTF);
+            app.context.profile_fps_deviation = true;
+         } else if (0 == strcmp(argv[i], "profile_texture")) {
             enable_printf(PROFILE_TEXTURE_PERF_PRINTF);
          } else if (0 == strcmp(argv[i], "printfjson")) {
             enable_printf(JSON_PRINTF);
