@@ -23,6 +23,7 @@ static int show_cursor = 0;
 static bool input_loop = true;
 static volatile bool render_loop = true;
 static uint32_t render_iters;
+static uint32_t low_fps_count;
 
 void sdl_render_loop(view_context* view) {
     const app_context* app_context = view->app;
@@ -76,20 +77,35 @@ void sdl_render_loop(view_context* view) {
         int64_t fps = 1000000/(ms_6 - ms_00);
 //        if ( !profile_fps_deviation || (fps < 59 || fps > 61)) {
         if ( !profile_fps_deviation || (fps < 59)) {
-        profile_printf("fps=%03ld t=%06ld pr=%06ld v=%06ld rc=%06ld wr=%06ld s=%06ld rp=%06ld pe=%06ld off= %06ld rp+s=%06ld xs=%06ld \n",
-                fps,
-                ms_6 - ms_00, //t
-                ms_1 - ms_0, //pr
-                ms_2 - ms_1, //v
-                ms_3 - ms_2, //rc
-                ms_4 - ms_3, //wr
-                ms_5 - ms_4, //s
-                ms_6 - ms_5, //rp
-                ms_7 - ms_6, //pe
-                ms_6 - ms_next,
-                ms_6 - ms_4, //rp +s
-                 ms_5 - ms_4 - sleeptime
-               );
+            ++low_fps_count;
+            if (app_context->vsync == 0) {
+                profile_printf("fps=%03ld t=%06ld pr=%06ld v=%06ld rc=%06ld wr=%06ld s=%06ld rp=%06ld pe=%06ld off= %06ld rp+s=%06ld xs=%06ld \n",
+                    fps,
+                    ms_6 - ms_00, //t
+                    ms_1 - ms_0, //pr
+                    ms_2 - ms_1, //v
+                    ms_3 - ms_2, //rc
+                    ms_4 - ms_3, //wr
+                    ms_5 - ms_4, //s
+                    ms_6 - ms_5, //rp
+                    ms_7 - ms_6, //pe
+                    ms_6 - ms_next,
+                    ms_6 - ms_4, //rp +s
+                    ms_5 - ms_4 - sleeptime
+                   );
+            } else {
+                profile_printf("fps=%03ld t=%06ld pr=%06ld v=%06ld rc=%06ld wr=%06ld rp=%06ld pe=%06ld \n",
+                    fps,
+                    ms_6 - ms_00, //t
+                    ms_1 - ms_0, //pr
+                    ms_2 - ms_1, //v
+                    ms_3 - ms_2, //rc
+                    ms_4 - ms_3, //wr
+                    ms_6 - ms_5, //rp
+                    ms_7 - ms_6, //pe
+                    ms_6 - ms_next
+                   );
+            }
         }
         ++render_iters;
         ms_00 = ms_6;
@@ -97,6 +113,7 @@ void sdl_render_loop(view_context* view) {
 
 //        SDL_ShowCursor(show_cursor != 0 ? SDL_ENABLE : SDL_DISABLE);
     }
+    profile_printf("low_fps_count=%u/%u %f\n", low_fps_count, render_iters, (float)low_fps_count*100/render_iters);
     debug_printf("*** render loop end ****\n");
 }
 
