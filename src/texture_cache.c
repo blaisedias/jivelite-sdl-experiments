@@ -207,9 +207,9 @@ static uint32_t hashfn(const char* token) {
 static void release_texture(tcache_entry* tce) {
     assert(external_tce(tce));
     if (external_tce(tce) && tce->texture) {
-        uint64_t ms_0 = get_micro_seconds();
+        int64_t ms_0 = get_micro_seconds();
         SDL_DestroyTexture((SDL_Texture*)tce->texture);
-        uint64_t ms_1 = get_micro_seconds();
+        int64_t ms_1 = get_micro_seconds();
 //        perf_printf("release_texture: destroy_texture: %07.2f millis\n", (float)(ms_1 - ms_0)/1000);
         tce->texture = NULL;
         num_texture_bytes -= tce->num_bytes;
@@ -365,9 +365,9 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* ren
         __atomic_store_n(&tce->lru_count, lru_counter, __ATOMIC_RELEASE);
 
         if (tce->texture == NULL && tce->surface != NULL) {
-            uint64_t ms_ct_0 =get_micro_seconds();
+            int64_t ms_ct_0 =get_micro_seconds();
             SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, tce->surface);
-            uint64_t ms_ct_1 =get_micro_seconds();
+            int64_t ms_ct_1 =get_micro_seconds();
 //            perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
             if (NULL == texture) {
                 error_printf("tcache_quick_get_texture: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
@@ -496,12 +496,12 @@ static struct {
 // Devise a scheme where entries are marked for ejection in the context of other threads
 // and the renderer thread merely performs the release.
 static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
-    uint64_t ms_0 = get_micro_seconds();
+    int64_t ms_0 = get_micro_seconds();
 //    static tcache_entry* eject_tbl[HASHTPRIME];
     int ejected_count = 0;
-//    uint64_t ms_ct_0 = get_micro_seconds();
+//    int64_t ms_ct_0 = get_micro_seconds();
 //    int count = lru_sort_tce(eject_tbl);
-//    uint64_t ms_ct_1 = get_micro_seconds();
+//    int64_t ms_ct_1 = get_micro_seconds();
 //    profile_texture_printf("tcache_eject: lru_sort_tcache: %06lu\n", ms_ct_1 - ms_ct_0);
 //    for(int ix=0; ix < count && check(increment, ejected_count); ++ix) {
     for(; lru_eject.ix < lru_eject.count && check(increment, ejected_count); ++lru_eject.ix) {
@@ -514,7 +514,7 @@ static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
         }
     }
     assert(lru_eject.ix < lru_eject.count);
-    uint64_t ms_1 = get_micro_seconds();
+    int64_t ms_1 = get_micro_seconds();
     profile_texture_printf("tcache_eject: %06lu usec ejected %d\n", ms_1- ms_0, ejected_count);
 //    perf_printf("tcache_eject: %f millis\n", (float)(ms_1 - ms_0)/1000);
     return ejected_count;
@@ -761,7 +761,7 @@ static void _tcache_flush_textures(SDL_Renderer* renderer) {
             return;
         }
 
-        uint64_t ms_0 = get_micro_seconds();
+        int64_t ms_0 = get_micro_seconds();
         // BEFORE deleting, clear the delete_requested flag,
         // then if another thread requests a texture delete during the scan of cached entries
         // for textures to delete:
@@ -778,7 +778,7 @@ static void _tcache_flush_textures(SDL_Renderer* renderer) {
                 _delete_texture(texture_id);
             }
         }
-        uint64_t ms_1 = get_micro_seconds();
+        int64_t ms_1 = get_micro_seconds();
         profile_texture_printf("texture_flush: %06lu usec\n", ms_1 - ms_0);
 
         tcache_unlock(&delete_lock);
@@ -803,10 +803,10 @@ void tcache_render_prep(SDL_Renderer* renderer) {
     // bump the LRU counter
     __atomic_add_fetch(&lru_counter, 1, __ATOMIC_ACQ_REL);
     // setup for lru cache ejection,
-//    uint64_t ms_sort_0 = get_micro_seconds();
+//    int64_t ms_sort_0 = get_micro_seconds();
     lru_eject.count = lru_sort_tce(lru_eject.tbl);
     lru_eject.ix = 0;
-//    uint64_t ms_sort_1 = get_micro_seconds();
+//    int64_t ms_sort_1 = get_micro_seconds();
 //    profile_texture_printf("lru_sort_tcache: %06lu\n", ms_sort_1 - ms_sort_0);
 }
 

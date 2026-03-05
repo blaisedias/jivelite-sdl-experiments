@@ -32,56 +32,63 @@ void sdl_render_loop(view_context* view) {
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
     SDL_ShowCursor(SDL_DISABLE);
 
-    // ensure that ms_00 is set to immediately after return from
+    // try to set ms_00 to immediately after return from
     // SDL_RenderPresent with vsync set.
     SDL_RenderSetVSync(app_context->renderer, 1);
     SDL_RenderClear(app_context->renderer);
     SDL_RenderPresent(app_context->renderer);
-    uint64_t ms_00 = get_micro_seconds();
-    uint64_t ms_next = ms_00 + app_context->frame_time_micros;
+    SDL_RenderClear(app_context->renderer);
+    SDL_RenderPresent(app_context->renderer);
+    int64_t ms_00 = get_micro_seconds();
+    int64_t ms_next = ms_00 + app_context->frame_time_micros;
     SDL_RenderSetVSync(app_context->renderer, app_context->vsync);
 
     while (render_loop) {
-        uint64_t ms_0 = get_micro_seconds();
+        int64_t ms_0 = get_micro_seconds();
         tcache_render_prep(app_context->renderer);
 //        tcache_flush_textures(app_context->renderer);
 //        tcache_resolve_textures(app_context->renderer);
-        uint64_t ms_1 = get_micro_seconds();
+        int64_t ms_1 = get_micro_seconds();
         visualizer_vumeter(vols);
-        uint64_t ms_2 = get_micro_seconds();
+        int64_t ms_2 = get_micro_seconds();
         SDL_RenderClear(app_context->renderer);
 
-        uint64_t ms_3 = get_micro_seconds();
+        int64_t ms_3 = get_micro_seconds();
 
         for(widget* widget=view->list->head.next; widget != NULL; widget=widget->next) {
             if (!widget->hidden) {
                 widget->render(widget);
             }
         }
-        uint64_t ms_4 = get_micro_seconds();
+        int64_t ms_4 = get_micro_seconds();
 
+        int64_t sleeptime = 0;
         if (app_context->vsync == 0) {
-            sleep_micro_seconds_delta(ms_next - 1000, get_micro_seconds());
+            sleeptime = ms_next - 1000 - get_micro_seconds();
+            sleep_micro_seconds(sleeptime);
         }
-        uint64_t ms_5 = get_micro_seconds();
+        int64_t ms_5 = get_micro_seconds();
         SDL_RenderPresent(app_context->renderer);
-        uint64_t ms_6 = get_micro_seconds();
+        int64_t ms_6 = get_micro_seconds();
         SDL_PumpEvents();
-        uint64_t ms_7 = get_micro_seconds();
+        int64_t ms_7 = get_micro_seconds();
 //        profile_printf("fps=%02lu t=%06lu v=%06lu rt=%06lu wr=%06lu rtwr= rp=%06lu\n",
-        uint64_t fps = 1000000/(ms_6 - ms_00);
-        if ( !profile_fps_deviation || (fps < 59 || fps > 61)) {
-        profile_printf("fps=%03lu t=%06lu pr=%06lu v=%06lu rc=%06lu wr=%06lu s=%06lu rp=%06lu pe=%06lu off=%06lu\n",
+        int64_t fps = 1000000/(ms_6 - ms_00);
+//        if ( !profile_fps_deviation || (fps < 59 || fps > 61)) {
+        if ( !profile_fps_deviation || (fps < 59)) {
+        profile_printf("fps=%03ld t=%06ld pr=%06ld v=%06ld rc=%06ld wr=%06ld s=%06ld rp=%06ld pe=%06ld off= %06ld rp+s=%06ld xs=%06ld \n",
                 fps,
-                ms_6 - ms_00,
-                ms_1 - ms_0,
-                ms_2 - ms_1,
-                ms_3 - ms_2,
-                ms_4 - ms_3,
-                ms_5 - ms_4,
-                ms_6 - ms_5,
-                ms_7 - ms_6,
-                ms_5 - ms_next
+                ms_6 - ms_00, //t
+                ms_1 - ms_0, //pr
+                ms_2 - ms_1, //v
+                ms_3 - ms_2, //rc
+                ms_4 - ms_3, //wr
+                ms_5 - ms_4, //s
+                ms_6 - ms_5, //rp
+                ms_7 - ms_6, //pe
+                ms_6 - ms_next,
+                ms_6 - ms_4, //rp +s
+                 ms_5 - ms_4 - sleeptime
                );
         }
         ++render_iters;
@@ -320,7 +327,7 @@ void sdl_input_loop(view_context* view) {
 
     while (input_loop) {
         ++iters;
-        uint64_t t0 = get_micro_seconds();
+        int64_t t0 = get_micro_seconds();
         SDL_Event event;
         while(SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_FIRSTEVENT, SDL_LASTEVENT)) {
             switch (event.type) {

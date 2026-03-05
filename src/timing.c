@@ -6,7 +6,7 @@
 #include <time.h>
 
 
-uint64_t get_micro_seconds() {
+int64_t get_micro_seconds() {
     uint64_t millis;
     struct timespec  ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
@@ -18,24 +18,22 @@ uint64_t get_micro_seconds() {
     return millis;
 }
 
-uint64_t get_milli_seconds() {
+int64_t get_milli_seconds() {
     return get_micro_seconds()/1000;
 }
 
-void sleep_milli_seconds(uint64_t millis) {
+void sleep_milli_seconds(int64_t millis) {
+    if (millis < 0) {
+        return;
+    }
     struct timespec ts = {.tv_sec =0, .tv_nsec = 1000000*millis};
     nanosleep(&ts, NULL);
 }
 
-void sleep_micro_seconds(uint64_t micros) {
+void sleep_micro_seconds(int64_t micros) {
+    if (micros < 0) {
+        return;
+    }
     struct timespec ts = {.tv_sec =0, .tv_nsec = 1000*micros};
     nanosleep(&ts, NULL);
-}
-
-// sleep micros1 - micros2 if micros1 > micros2
-void sleep_micro_seconds_delta(uint64_t micros1, uint64_t micros2) {
-    if (micros1 > micros2) {
-        struct timespec ts = {.tv_sec =0, .tv_nsec = 1000*(micros1 - micros2)};
-        nanosleep(&ts, NULL);
-    }
 }

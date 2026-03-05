@@ -117,7 +117,7 @@ void VUMeter_orientate(vumeter_properties *vu, float rotation, SDL_Rect* enclosu
 static char load_buffer[4096];
 SDL_bool VUMeter_load_media(SDL_Renderer *renderer, vumeter_properties *vu) {
     int indx;
-    uint64_t ms = get_milli_seconds();
+    int64_t ms = get_milli_seconds();
     SDL_bool ok = SDL_TRUE;
     load_printf("load media: %p\n"
             "resources: count=%d names=%p textures=%p\n",
@@ -344,10 +344,10 @@ vumeter_properties* VUMeter_scale(vumeter_properties* vu, int w_in, int h_in, fl
 static SDL_RendererFlip flip = SDL_FLIP_NONE;
 static uint64_t frame_count;
 static uint32_t sample_frame_count;
-static uint64_t acc_render_time;
-static uint64_t max_render_time;
-static uint64_t ms_1;
-static uint64_t ms_2;
+static int64_t acc_render_time;
+static int64_t max_render_time;
+static int64_t ms_1;
+static int64_t ms_2;
 // to check and reset performance counters when vumeter is changed.
 static const vumeter* prev_vumeter;
 
@@ -366,7 +366,7 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
         prev_vumeter = vumeter;
     }
 
-    uint64_t ms0 = get_micro_seconds();
+    int64_t ms0 = get_micro_seconds();
 
     int i;
 
@@ -506,7 +506,7 @@ void VUMeter_draw(SDL_Renderer *renderer, vumeter_properties *vu, const vumeter*
     vol_printf("\r");
 
 #undef _RENDER_VOLUME_LEVEL_
-    uint64_t delta_pf = get_micro_seconds() - ms0;
+    int64_t delta_pf = get_micro_seconds() - ms0;
     acc_render_time += delta_pf;
 
     if (delta_pf > max_render_time) {
