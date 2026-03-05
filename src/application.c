@@ -60,16 +60,17 @@ void sdl_render_loop(view_context* view) {
         uint64_t ms_4 = get_micro_seconds();
 
         if (app_context->vsync == 0) {
-            sleep_micro_seconds_delta(ms_next, get_micro_seconds());
+            sleep_micro_seconds_delta(ms_next - 1000, get_micro_seconds());
         }
         uint64_t ms_5 = get_micro_seconds();
         SDL_RenderPresent(app_context->renderer);
         uint64_t ms_6 = get_micro_seconds();
         SDL_PumpEvents();
+        uint64_t ms_7 = get_micro_seconds();
 //        profile_printf("fps=%02lu t=%06lu v=%06lu rt=%06lu wr=%06lu rtwr= rp=%06lu\n",
         uint64_t fps = 1000000/(ms_6 - ms_00);
 //        if (fps < 59 || fps > 61) {
-        profile_printf("fps=%03lu t=%06lu pr=%06lu v=%06lu rc=%06lu wr=%06lu s=%06lu rp=%06lu %06lu\n",
+        profile_printf("fps=%03lu t=%06lu pr=%06lu v=%06lu rc=%06lu wr=%06lu s=%06lu rp=%06lu pe=%06lu off=%06lu\n",
                 fps,
                 ms_6 - ms_00,
                 ms_1 - ms_0,
@@ -78,6 +79,7 @@ void sdl_render_loop(view_context* view) {
                 ms_4 - ms_3,
                 ms_5 - ms_4,
                 ms_6 - ms_5,
+                ms_7 - ms_6,
                 ms_5 - ms_next
                );
  //       }
