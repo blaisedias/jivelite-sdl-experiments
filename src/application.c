@@ -46,6 +46,8 @@ void sdl_render_loop(view_context* view) {
 
     while (render_loop) {
         int64_t ms_0 = get_micro_seconds();
+        SDL_PumpEvents();
+        int64_t ms_pe = get_micro_seconds();
         tcache_render_prep(app_context->renderer);
 //        tcache_flush_textures(app_context->renderer);
 //        tcache_resolve_textures(app_context->renderer);
@@ -71,8 +73,6 @@ void sdl_render_loop(view_context* view) {
         int64_t ms_5 = get_micro_seconds();
         SDL_RenderPresent(app_context->renderer);
         int64_t ms_6 = get_micro_seconds();
-        SDL_PumpEvents();
-        int64_t ms_7 = get_micro_seconds();
 //        profile_printf("fps=%02lu t=%06lu v=%06lu rt=%06lu wr=%06lu rtwr= rp=%06lu\n",
         int64_t fps = 1000000/(ms_6 - ms_00);
 //        if ( !profile_fps_deviation || (fps < 59 || fps > 61)) {
@@ -82,28 +82,28 @@ void sdl_render_loop(view_context* view) {
                 profile_printf("fps=%03ld t=%06ld pr=%06ld v=%06ld rc=%06ld wr=%06ld s=%06ld rp=%06ld pe=%06ld off= %06ld rp+s=%06ld xs=%06ld \n",
                     fps,
                     ms_6 - ms_00, //t
-                    ms_1 - ms_0, //pr
+                    ms_1 - ms_pe, //pr
                     ms_2 - ms_1, //v
                     ms_3 - ms_2, //rc
                     ms_4 - ms_3, //wr
                     ms_5 - ms_4, //s
                     ms_6 - ms_5, //rp
-                    ms_7 - ms_6, //pe
+                    ms_pe - ms_0, //pe
                     ms_6 - ms_next,
                     ms_6 - ms_4, //rp +s
                     ms_5 - ms_4 - sleeptime
                    );
             } else {
-                profile_printf("fps=%03ld t=%06ld pr=%06ld v=%06ld rc=%06ld wr=%06ld rp=%06ld pe=%06ld \n",
+                profile_printf("fps=%03ld t=%06ld pr=%06ld v=%06ld rc=%06ld wr=%06ld rp=%06ld pe=%06ld ct=%06ld\n",
                     fps,
                     ms_6 - ms_00, //t
-                    ms_1 - ms_0, //pr
+                    ms_1 - ms_pe, //pr
                     ms_2 - ms_1, //v
                     ms_3 - ms_2, //rc
                     ms_4 - ms_3, //wr
                     ms_6 - ms_5, //rp
-                    ms_7 - ms_6, //pe
-                    ms_6 - ms_next
+                    ms_pe - ms_0, //pe
+                    ms_1 - ms_0 + ms_2 - ms_1 + ms_3 - ms_2 + ms_4 - ms_3 + ms_6 - ms_5 +  ms_pe - ms_0
                    );
             }
         }
