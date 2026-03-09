@@ -244,8 +244,11 @@ int compare_tce_paths(const char* path1, const char* path2) {
     if (path1 == path2) {
         return 0;
     }
-    if (path1 == NULL || path2 == NULL) {
+    if (path1 == NULL) {
         return -1;
+    }
+    if (path2 == NULL) {
+        return 1;
     }
     return strcmp(path1, path2);
 }
