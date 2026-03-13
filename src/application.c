@@ -14,8 +14,9 @@
 #include "logging.h"
 #include "timing.h"
 #include "texture_cache.h"
+#include "lyrion_player.h"
 
-#define HIDE_CURSOR_COUNT  5
+#define HIDE_CURSOR_COUNT  50
 #define IMAGE_FLAGS IMG_INIT_PNG
 
 static SDL_RendererFlags render_flags = SDL_RENDERER_ACCELERATED;
@@ -26,35 +27,35 @@ static uint32_t render_iters;
 static uint32_t low_fps_count;
 
 void sdl_render_loop(view_context* view) {
-    const app_context* app_context = view->app;
-    bool profile_fps_deviation = app_context->profile_fps_deviation;
-    SDL_RenderClear(app_context->renderer);
+    const app_context* app_ctx = view->app;
+    bool profile_fps_deviation = app_ctx->profile_fps_deviation;
+    SDL_RenderClear(app_ctx->renderer);
     int vols[2] = {0, 0};
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
     SDL_ShowCursor(SDL_DISABLE);
 
     // try to set ms_00 to immediately after return from
     // SDL_RenderPresent with vsync set.
-    SDL_RenderSetVSync(app_context->renderer, 1);
-    SDL_RenderClear(app_context->renderer);
-    SDL_RenderPresent(app_context->renderer);
-    SDL_RenderClear(app_context->renderer);
-    SDL_RenderPresent(app_context->renderer);
+    SDL_RenderSetVSync(app_ctx->renderer, 1);
+    SDL_RenderClear(app_ctx->renderer);
+    SDL_RenderPresent(app_ctx->renderer);
+    SDL_RenderClear(app_ctx->renderer);
+    SDL_RenderPresent(app_ctx->renderer);
     int64_t ms_00 = get_micro_seconds();
-    int64_t ms_next = ms_00 + app_context->frame_time_micros;
-    SDL_RenderSetVSync(app_context->renderer, app_context->vsync);
+    int64_t ms_next = ms_00 + app_ctx->frame_time_micros;
+    SDL_RenderSetVSync(app_ctx->renderer, app_ctx->vsync);
 
-    while (render_loop) {
+    while (__atomic_load_n(&render_loop, __ATOMIC_ACQUIRE)) {
         int64_t ms_0 = get_micro_seconds();
         SDL_PumpEvents();
         int64_t ms_pe = get_micro_seconds();
-        tcache_render_prep(app_context->renderer);
-//        tcache_flush_textures(app_context->renderer);
-//        tcache_resolve_textures(app_context->renderer);
+        tcache_render_prep(app_ctx->renderer);
+//        tcache_flush_textures(app_ctx->renderer);
+//        tcache_resolve_textures(app_ctx->renderer);
         int64_t ms_1 = get_micro_seconds();
         visualizer_vumeter(vols);
         int64_t ms_2 = get_micro_seconds();
-        SDL_RenderClear(app_context->renderer);
+        SDL_RenderClear(app_ctx->renderer);
 
         int64_t ms_3 = get_micro_seconds();
 
@@ -66,19 +67,19 @@ void sdl_render_loop(view_context* view) {
         int64_t ms_4 = get_micro_seconds();
 
         int64_t sleeptime = 0;
-        if (app_context->vsync == 0) {
+        if (app_ctx->vsync == 0) {
             sleeptime = ms_next - 1000 - get_micro_seconds();
             sleep_micro_seconds(sleeptime);
         }
         int64_t ms_5 = get_micro_seconds();
-        SDL_RenderPresent(app_context->renderer);
+        SDL_RenderPresent(app_ctx->renderer);
         int64_t ms_6 = get_micro_seconds();
 //        profile_printf("fps=%02lu t=%06lu v=%06lu rt=%06lu wr=%06lu rtwr= rp=%06lu\n",
         int64_t fps = 1000000/(ms_6 - ms_00);
 //        if ( !profile_fps_deviation || (fps < 59 || fps > 61)) {
         if ( !profile_fps_deviation || (fps < 59)) {
             ++low_fps_count;
-            if (app_context->vsync == 0) {
+            if (app_ctx->vsync == 0) {
                 profile_printf("fps=%03ld t=%06ld pr=%06ld v=%06ld rc=%06ld wr=%06ld s=%06ld rp=%06ld pe=%06ld off= %06ld rp+s=%06ld xs=%06ld \n",
                     fps,
                     ms_6 - ms_00, //t
@@ -109,7 +110,7 @@ void sdl_render_loop(view_context* view) {
         }
         ++render_iters;
         ms_00 = ms_6;
-        ms_next += app_context->frame_time_micros;
+        ms_next += app_ctx->frame_time_micros;
 
 //        SDL_ShowCursor(show_cursor != 0 ? SDL_ENABLE : SDL_DISABLE);
     }
@@ -117,8 +118,8 @@ void sdl_render_loop(view_context* view) {
     debug_printf("*** render loop end ****\n");
 }
 
-bool app_initialize(app_context* app_context, const char* window_title) {
-    if (app_context->vsync) {
+bool app_initialize(app_context* app_ctx, const char* window_title) {
+    if (app_ctx->vsync) {
         render_flags |=  SDL_RENDERER_PRESENTVSYNC;
     }
 
@@ -144,15 +145,15 @@ bool app_initialize(app_context* app_context, const char* window_title) {
             if (0 == SDL_GetCurrentDisplayMode(i_display, &dm)) {
                 // TODO: handle multiple displays?
                 if (i_display == 0) {
-                    app_context->refresh_rate = dm.refresh_rate;
-                    app_context->frame_time_millis = 1000/dm.refresh_rate;
-                    app_context->frame_time_micros = 1000000/dm.refresh_rate;
+                    app_ctx->refresh_rate = dm.refresh_rate;
+                    app_ctx->frame_time_millis = 1000/dm.refresh_rate;
+                    app_ctx->frame_time_micros = 1000000/dm.refresh_rate;
                     printf("Display:%d fmt=%x, w=%d, h=%d, refresh rate:%d %d milliSeconds %d microSeconds\n",
                             i_display,
                             dm.format, dm.w, dm.h,
                             dm.refresh_rate,
-                            app_context->frame_time_millis,
-                            app_context->frame_time_micros);
+                            app_ctx->frame_time_millis,
+                            app_ctx->frame_time_micros);
                 }
             } 
     }
@@ -193,15 +194,15 @@ bool app_initialize(app_context* app_context, const char* window_title) {
                }
 */
                 // puts("SDL_SYSWM_WAYLAND");
-                if (app_context->fullscreen) {
-                    app_context->window = SDL_CreateWindow(window_title,
+                if (app_ctx->fullscreen) {
+                    app_ctx->window = SDL_CreateWindow(window_title,
                            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                            0, 0,
                            SDL_WINDOW_FULLSCREEN_DESKTOP);
                 } else {
-                    app_context->window = SDL_CreateWindow(window_title,
+                    app_ctx->window = SDL_CreateWindow(window_title,
                             SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                            app_context->screen_width, app_context->screen_height,
+                            app_ctx->screen_width, app_ctx->screen_height,
                             0);
                 }
                break;
@@ -225,7 +226,7 @@ bool app_initialize(app_context* app_context, const char* window_title) {
                break;
            case SDL_SYSWM_KMSDRM:
                 puts("SDL_SYSWM_KMSDRM");
-                app_context->window = SDL_CreateWindow(window_title,
+                app_ctx->window = SDL_CreateWindow(window_title,
                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                        0, 0,
                        SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -236,27 +237,27 @@ bool app_initialize(app_context* app_context, const char* window_title) {
         }
     }
 
-    if (!app_context->window) {
+    if (!app_ctx->window) {
         error_printf("creating window: %s\n", SDL_GetError());
         return true;
     }
-//    app_context->renderer = SDL_CreateRenderer(app_context->window, -1, 0);
-    app_context->renderer = SDL_CreateRenderer(app_context->window, -1, render_flags);
-    if (!app_context->renderer) {
+//    app_ctx->renderer = SDL_CreateRenderer(app_ctx->window, -1, 0);
+    app_ctx->renderer = SDL_CreateRenderer(app_ctx->window, -1, render_flags);
+    if (!app_ctx->renderer) {
         error_printf("creating renderer: %s\n", SDL_GetError());
         return true;
     }
     tcache_set_renderer_tid(SDL_GetThreadID(NULL));
-    SDL_GetWindowSize(app_context->window, &app_context->screen_width, &app_context->screen_height);
-    app_context->pixelFormat = SDL_GetWindowPixelFormat(app_context->window);
-    app_context->bytes_per_pixel = SDL_BYTESPERPIXEL(app_context->pixelFormat);
+    SDL_GetWindowSize(app_ctx->window, &app_ctx->screen_width, &app_ctx->screen_height);
+    app_ctx->pixelFormat = SDL_GetWindowPixelFormat(app_ctx->window);
+    app_ctx->bytes_per_pixel = SDL_BYTESPERPIXEL(app_ctx->pixelFormat);
 
 //    srand((unsigned)time(NULL));
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-    SDL_RenderSetLogicalSize(app_context->renderer, app_context->screen_width, app_context->screen_height);
+    SDL_RenderSetLogicalSize(app_ctx->renderer, app_ctx->screen_width, app_ctx->screen_height);
 
-    printf("pixelFormat: 0x%x %u bytes/pixel ", app_context->pixelFormat, app_context->bytes_per_pixel);
-    switch(app_context->pixelFormat) {
+    printf("pixelFormat: 0x%x %u bytes/pixel ", app_ctx->pixelFormat, app_ctx->bytes_per_pixel);
+    switch(app_ctx->pixelFormat) {
         case SDL_PIXELFORMAT_UNKNOWN: printf("SDL_PIXELFORMAT_UNKNOWN\n"); break;
         case SDL_PIXELFORMAT_INDEX1LSB: printf("SDL_PIXELFORMAT_INDEX1LSB\n"); break;
         case SDL_PIXELFORMAT_INDEX1MSB: printf("SDL_PIXELFORMAT_INDEX1MSB\n"); break;
@@ -303,19 +304,19 @@ bool app_initialize(app_context* app_context, const char* window_title) {
     return false;
 }
 
-void app_cleanup(app_context* app_context, int exit_status) {
+void app_cleanup(app_context* app_ctx, int exit_status) {
 //    TTF_CloseFont(app->text_font);
-    SDL_DestroyRenderer(app_context->renderer);
-    SDL_DestroyWindow(app_context->window);
+    SDL_DestroyRenderer(app_ctx->renderer);
+    SDL_DestroyWindow(app_ctx->window);
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();
     exit(exit_status);
 }
 
-void print_app_runtime_info(app_context* app_context) {
+void print_app_runtime_info(app_context* app_ctx) {
     SDL_RendererInfo info;
-    if (0 == SDL_GetRendererInfo(app_context->renderer, &info)) {
+    if (0 == SDL_GetRendererInfo(app_ctx->renderer, &info)) {
         printf(
                 "Renderer info:\n"
                 "    name=%s\n"
@@ -329,20 +330,105 @@ void print_app_runtime_info(app_context* app_context) {
         printf("Failed to retrieve renderer information\n");
     }
     printf("display:%dx%d Orientation:%f,  max seconds:%u performance freq:%lu\n",
-           app_context->screen_width,
-           app_context->screen_height,
-           app_context->orientation,
-           app_context->max_secs,
+           app_ctx->screen_width,
+           app_ctx->screen_height,
+           app_ctx->orientation,
+           app_ctx->max_secs,
            SDL_GetPerformanceFrequency());
 }
 
 void sdl_input_loop(view_context* view) {
-    const app_context* app_context = view->app;
+    const app_context* app_ctx = view->app;
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
     bool ignore_SDL_FINGER = 0 == start_touch_screen_event_generator(NULL);
     uint32_t iters=0;
+    ((app_context *)app_ctx)->player = open_local_player(app_ctx->lms);
+    player_transient_state pts;
 
     while (input_loop) {
+        if (iters % 5 == 0) {
+            if (poll_player(app_ctx->player, &pts)) {
+                bool can_seek = true;
+                {
+                    player_value pvalue;
+                    switch(get_player_value(app_ctx->player, &pvalue, "CAN_SEEK")) {
+                            case PFV_NONE:
+                                error_printf("got nothing for player value CAN_SEEK\n");
+                                break;
+                            case PFV_INT:
+                                debug_printf("got int %d for player CAN_SEEK\n", pvalue.integer);
+                                can_seek = pvalue.integer;
+                                break;
+                            case PFV_STRINGPTR:
+                                error_printf("got string %s for player value CAN_SEEK\n", pvalue.strptr);
+                                break;
+                    }
+                }
+
+                for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
+                    if (t->player_value_key) {
+                        player_value pvalue;
+                        switch(get_player_value(app_ctx->player, &pvalue, t->player_value_key)) {
+                            case PFV_NONE:
+                                error_printf("got nothing for player value %s\n", t->player_value_key);
+                                break;
+                            case PFV_INT:
+                                debug_printf("got int %d for player value %s\n", pvalue.integer, t->player_value_key);
+                                if (t->type == WIDGET_MULTISTATE_BUTTON) {
+                                    widget_multistate_button_set_state(t, pvalue.integer);
+                                } else if (t->type == WIDGET_SLIDER) {
+                                    widget_slider_set_value(t, pvalue.integer);
+                                }
+                                break;
+                            case PFV_STRINGPTR:
+                                error_printf("got string %s for player value %s\n", pvalue.strptr, t->player_value_key);
+                                break;
+                        }
+                    }
+                    if (t->player_range_value_key) {
+                        player_value pvalue;
+                        switch(get_player_value(app_ctx->player, &pvalue, t->player_range_value_key)) {
+                            case PFV_NONE:
+                                error_printf("got nothing for player range value %s\n", t->player_range_value_key);
+                                break;
+                            case PFV_INT:
+                                debug_printf("got int %d for player range value %s\n", pvalue.integer, t->player_range_value_key);
+                                if (t->type == WIDGET_SLIDER) {
+                                    widget_slider_range(t, 0, pvalue.integer);
+                                }
+                                break;
+                            case PFV_STRINGPTR:
+                                error_printf("got string %s for player range value %s\n", pvalue.strptr, t->player_range_value_key);
+                                break;
+                        }
+                    }
+                    if (t->type == WIDGET_SLIDER && 0 == strcmp(t->player_value_key, "time")) {
+                        widget_slider_set_interactive(t, can_seek);
+                    }
+                }
+            }
+            player_value pvalue;
+            get_player_value(app_ctx->player, &pvalue, "VOLUME");
+            int volume = pvalue.integer;
+            get_player_value(app_ctx->player, &pvalue, "DURATION");
+            int duration = pvalue.integer;
+            get_player_value(app_ctx->player, &pvalue, "time");
+            int elapsed = pvalue.integer;
+            for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
+                if (t->player_value_key) {
+                    if (0 == strcmp("VOLUME", t->player_value_key)) {
+                        if (t->type == WIDGET_SLIDER) {
+                            widget_slider_set_value(t, volume);
+                        }
+                    }
+                    if (duration && 0 == strcmp("time", t->player_value_key)) {
+                        if (t->type == WIDGET_SLIDER) {
+                            widget_slider_set_value(t, elapsed);
+                        }
+                    }
+                }
+            }
+        }
         ++iters;
         int64_t t0 = get_micro_seconds();
         SDL_Event event;
@@ -415,11 +501,11 @@ void sdl_input_loop(view_context* view) {
                 } break;
             case SDL_FINGERMOTION:
                 if (ignore_SDL_FINGER) {
-                    input_printf("IGNORING SFMO: %04d, %04d\n",(int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
+                    input_printf("IGNORING SFMO: %04d, %04d\n",(int)(event.tfinger.x*app_ctx->screen_width), (int)(event.tfinger.y*app_ctx->screen_height));
                 } else {
                     SDL_Point pt = { 
-                        .x = (int)(event.tfinger.x*app_context->screen_width),
-                        .y = (int)(event.tfinger.y*app_context->screen_height)
+                        .x = (int)(event.tfinger.x*app_ctx->screen_width),
+                        .y = (int)(event.tfinger.y*app_ctx->screen_height)
                     };
                     widget_list_react(view->list, POINTER_MOTION, &pt);
                 }
@@ -431,11 +517,11 @@ void sdl_input_loop(view_context* view) {
                 } break;
             case SDL_FINGERDOWN:
                 if (ignore_SDL_FINGER) {
-                    input_printf("IGNORING SFDN: %04d, %04d\n", (int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
+                    input_printf("IGNORING SFDN: %04d, %04d\n", (int)(event.tfinger.x*app_ctx->screen_width), (int)(event.tfinger.y*app_ctx->screen_height));
                 } else {
                     SDL_Point pt = { 
-                        .x = (int)(event.tfinger.x*app_context->screen_width),
-                        .y = (int)(event.tfinger.y*app_context->screen_height)
+                        .x = (int)(event.tfinger.x*app_ctx->screen_width),
+                        .y = (int)(event.tfinger.y*app_ctx->screen_height)
                     };
                     widget_list_react(view->list, POINTER_DOWN, &pt);
                 }
@@ -447,11 +533,11 @@ void sdl_input_loop(view_context* view) {
                 } break;
             case SDL_FINGERUP:
                 if (ignore_SDL_FINGER) {
-                    input_printf("IGNORING SFUP: %04d, %04d\n", (int)(event.tfinger.x*app_context->screen_width), (int)(event.tfinger.y*app_context->screen_height));
+                    input_printf("IGNORING SFUP: %04d, %04d\n", (int)(event.tfinger.x*app_ctx->screen_width), (int)(event.tfinger.y*app_ctx->screen_height));
                 } else {
                     SDL_Point pt = { 
-                        .x = (int)(event.tfinger.x*app_context->screen_width),
-                        .y = (int)(event.tfinger.y*app_context->screen_height)
+                        .x = (int)(event.tfinger.x*app_ctx->screen_width),
+                        .y = (int)(event.tfinger.y*app_ctx->screen_height)
                     };
                     widget_list_react(view->list, POINTER_UP, &pt);
                 }
@@ -465,12 +551,10 @@ void sdl_input_loop(view_context* view) {
                 break;
             }
         }
-        if (iters >= app_context->max_secs*10) {
-            printf("terminating: iterations=%d max_secs=%d frames rendered=%d\n",
-                   iters,
-                   app_context->max_secs,
-                   render_iters);
-            render_loop = false;
+        if (iters >= app_ctx->max_secs*10) {
+            printf("terminating: iterations=%d max_secs=%d\n",
+                   iters, app_ctx->max_secs);
+            __atomic_clear(&render_loop, __ATOMIC_RELEASE);
             input_loop = false;
         }
         if (show_cursor) {
@@ -485,7 +569,7 @@ void sdl_input_loop(view_context* view) {
             }
         }
         // close to 100 milliseconds
-        if (iters % (app_context->cycle_secs*10) == 0) {
+        if (iters % (app_ctx->cycle_secs*10) == 0) {
             for(widget* t = view->list->head.next; t != NULL; t = t->next) {
                 if (t->type == WIDGET_VUMETER) {
                     widget_vumeter_select_next(t);

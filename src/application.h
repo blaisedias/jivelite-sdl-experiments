@@ -2,6 +2,7 @@
 #ifndef __jl_application_h_
 #define __jl_application_h_
 #include "types.h"
+#include "lyrion_player.h"
 
 typedef struct {
     float           orientation;
@@ -24,6 +25,8 @@ typedef struct {
     int             frame_time_micros;
 
     bool            profile_fps_deviation;
+    const           char* lms;
+    player_ptr      player;
 } app_context;
 
 #endif // __jl_application_h_

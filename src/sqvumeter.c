@@ -55,6 +55,8 @@ const char* help_text=""
 " - decayhold <count>: number of frames for VU decay hold - reduces needle jitter\n"
 "\n"
 " - texture_cache_size <count>: maximum number of texture bytes\n"
+"\n"
+" - lms <name>: lyrion media server network name or ip address \n"
 "\n";  
 
 const char* json_file="./npvu.json";
@@ -201,6 +203,11 @@ int main(int argc, char **argv) {
                 tcache_set_limit(atoi(argv[i+1]));
                 i += 1;
             }
+        } else if (0 == strcmp(argv[i], "lms")) {
+            if (argc > i+1) {
+                app.context.lms = strdup(argv[i+1]);
+                i += 1;
+            } 
         } else {
             error_printf("Unknown command line option %d) %s\n", i, argv[i]);
             exit(EXIT_FAILURE);

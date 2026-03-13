@@ -31,7 +31,7 @@ void error_printf(char *format, ...) {
 	struct tm tm;
 	gettimeofday(&t, NULL);
 	gmtime_r(&t.tv_sec, &tm);
-    fprintf(stdout, "%04d%02d%02d %02d:%02d:%02d.%03ld ",
+    fprintf(stderr, "%04d%02d%02d %02d:%02d:%02d.%03ld ",
 				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 				tm.tm_hour, tm.tm_min, tm.tm_sec,
 				(long)(t.tv_usec / 1000));

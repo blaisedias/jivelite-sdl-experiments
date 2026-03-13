@@ -63,18 +63,20 @@ SQVUMETER_OBJS = \
 		  $(OBJS_DIR)/sqvumeter.o \
 		  $(OBJS_DIR)/application.o \
    		  $(OBJS_DIR)/util.o $(OBJS_DIR)/widgets.o $(OBJS_DIR)/actions.o \
-   		  $(OBJS_DIR)/vumeter_widget.o $(OBJS_DIR)/vumeter_util.o $(OBJS_DIR)/visualizer.o $(OBJS_DIR)/vis_vumeter.o \
    		  $(OBJS_DIR)/json.o $(OBJS_DIR)/widgets_json.o \
    		  $(OBJS_DIR)/platform_linux.o $(OBJS_DIR)/logging.o \
    		  $(OBJS_DIR)/city.o $(OBJS_DIR)/texture_cache.o \
 		  $(OBJS_DIR)/touch_screen.o \
 		  $(OBJS_DIR)/touch_screen_sdl2.o \
-   		  $(OBJS_DIR)/timing.o
+   		  $(OBJS_DIR)/timing.o \
+		  $(OBJS_DIR)/lyrion_player.o \
+   		  $(OBJS_DIR)/vumeter_widget.o $(OBJS_DIR)/vumeter_util.o $(OBJS_DIR)/visualizer.o $(OBJS_DIR)/vis_vumeter.o\
 
 all: $(BIN_DIR)/sqvumeter $(SHARED_OBJS) \
 	$(BIN_DIR)/test_tcache \
 	$(BIN_DIR)/test_widgets_json \
-	$(BIN_DIR)/test_touch
+	$(BIN_DIR)/test_touch \
+	$(BIN_DIR)/local_player_test \
 
 .PHONY: clean
 
@@ -150,6 +152,7 @@ TEST_WIDGETS_JSON_OBJS =  \
 	$(OBJS_DIR)/vis_vumeter.o \
 	$(OBJS_DIR)/city.o $(OBJS_DIR)/texture_cache.o \
 	$(OBJS_DIR)/timing.o \
+	$(OBJS_DIR)/lyrion_player.o \
 	$(OBJS_DIR)/platform_linux.o
 
 $(BIN_DIR)/test_widgets_json : $(OBJS_DIR)/test_widgets_json.o $(TEST_WIDGETS_JSON_OBJS) | $(BIN_DIR)
@@ -157,6 +160,11 @@ $(BIN_DIR)/test_widgets_json : $(OBJS_DIR)/test_widgets_json.o $(TEST_WIDGETS_JS
 
 # 3. touch screen
 $(BIN_DIR)/test_touch: $(OBJS_DIR)/test_touch.o $(OBJS_DIR)/touch_screen.o $(OBJS_DIR)/timing.o
+	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
+
+# 4. lyrion player test
+#
+$(BIN_DIR)/local_player_test: $(OBJS_DIR)/local_player_test.o $(OBJS_DIR)/lyrion_player.o $(OBJS_DIR)/logging.o
 	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
 
 # directories

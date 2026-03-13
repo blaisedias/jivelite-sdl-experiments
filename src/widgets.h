@@ -120,6 +120,8 @@ struct widget {
     //SDL_Rect    draw_rect;
 
     bool         atomic_pressed;
+    const char*  player_value_key;
+    const char*  player_range_value_key;
 
     union {
         vumeter_widget* vu;
@@ -141,6 +143,9 @@ struct widget {
             _btn_resource* res;
         }multistate_button;
         struct {
+            // interactive property as defined
+            bool defined_interactive;
+            // interactive property runtime controlled
             bool interactive;
             struct {
                 int start;
@@ -166,6 +171,9 @@ void render_none(widget* wdgt);
 const char* widget_type_name(widget_type typ);
 widget* widget_rect(widget *wdgt, const SDL_Rect *rect);
 widget* widget_bounds(widget *wdgt, int x, int y, int w, int h);
+widget* widget_set_player_value_key(widget* wdgt, const char* key);
+// TODO: fix implicit range start value of 0
+widget* widget_set_player_range_value_key(widget* wdgt, const char* key);
 
 /*
 widget* widget_next(widget *wdgt, widget* next);
@@ -198,6 +206,8 @@ widget *widget_vumeter_select_lock(widget *wdgt, bool lock);
 widget *widget_create_slider(const view_context*);
 widget *widget_slider_range(widget* , int start, int end);
 widget *widget_slider_set_value(widget* wdgt, int value);
+widget *widget_slider_set_interactive(widget* wdgt, bool yn);
+widget *widget_slider_define_interactive(widget* wdgt, bool yn);
 widget *widget_slider_get_value(widget* wdgt, int* value);
 widget *widget_slider_image_paths(widget* , slider_resource_ID id, const char* path1, const char* path2);
 widget *widget_slider_image_width(widget* , slider_resource_ID id, int width);

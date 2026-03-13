@@ -67,6 +67,7 @@ typedef enum {
     JT_RANGE,
     JT_RANGE_START,
     JT_RANGE_END,
+    JT_INTERACTIVE,
 
 // order of bar, pick, bar-start, bar-end should match slider_resource_ID enum
     JT_BAR,
@@ -75,6 +76,9 @@ typedef enum {
     JT_BAR_END,
     JT_WIDTH,
     JT_HEIGHT,
+
+    JT_PLAYER_VALUE,
+    JT_PLAYER_RANGE_VALUE,
 
     JT_END,
 
@@ -112,6 +116,7 @@ static const char* json_token_strings[]= {
     "range",
     "start",
     "end",
+    "interactive",
 
     "bar",
     "pick",
@@ -119,6 +124,9 @@ static const char* json_token_strings[]= {
     "bar_end",
     "width",
     "height",
+
+    "player_value",
+    "player_range_value",
 
     "",
 };
@@ -511,6 +519,7 @@ static void deserialise_one_widget(json_value* value, view_context* ctx) {
         case WIDGET_SLIDER:
             {
                 widget = widget_create_slider(ctx);
+                widget_slider_define_interactive(widget, get_object_boolean_value(value, JT_INTERACTIVE, true));
                 {
                     json_value* jrange = get_object_object_value(value, JT_RANGE);
                     if (jrange) {
@@ -556,6 +565,10 @@ static void deserialise_one_widget(json_value* value, view_context* ctx) {
             }break;
     }
     if (widget) {
+        widget_set_player_value_key(widget, get_object_string_value(value, JT_PLAYER_VALUE, NULL));
+        if (get_object_string_value(value, JT_PLAYER_RANGE_VALUE, NULL)) {
+            widget_set_player_range_value_key(widget, get_object_string_value(value, JT_PLAYER_RANGE_VALUE, NULL));
+        }
         json_printf("     location\n");
         SDL_Rect container = {  -1, -1, -10000, -10000 };
         deserialise_location(get_object_value(value, JT_LOCATION), ctx, &container, widget);
