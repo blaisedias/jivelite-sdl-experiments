@@ -4,7 +4,7 @@
 #include "types.h"
 #include "lyrion_player.h"
 
-typedef struct {
+typedef struct app_context {
     float           orientation;
     SDL_Rect        window_rect;
     SDL_Renderer*   renderer;
@@ -27,6 +27,16 @@ typedef struct {
     bool            profile_fps_deviation;
     const           char* lms;
     player_ptr      player;
+
+    const char*     window_title;
+    const char*     json_file;
+    bool            dump_vu;
+    const char*     first_vu_meter;
+
+    bool            ready;
 } app_context;
+
+void app_cleanup(app_context* app, int exit_status);
+void print_app_runtime_info(app_context* app_ctx);
 
 #endif // __jl_application_h_

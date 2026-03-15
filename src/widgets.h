@@ -219,7 +219,7 @@ struct widget_list {
 };
 
 struct view_context {
-    const app_context* app;
+    const struct app_context* app;
     widget_list*       list;
 };
 

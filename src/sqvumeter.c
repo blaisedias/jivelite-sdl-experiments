@@ -11,7 +11,7 @@
 #include "application.h"
 #include "widgets.h"
 #include "vumeter_util.h"
-#include "widgets_json.h"
+#include "timing.h"
 
 #define WINDOW_TITLE "Squeezelite Visualiser"
 
@@ -69,26 +69,23 @@ struct App {
 
 extern void sdl_render_loop(view_context* view);
 extern void sdl_input_loop(view_context* view);
-extern bool app_initialize(app_context*, const char* window_title);
-extern void app_cleanup(app_context* app, int exit_status);
-extern void print_app_runtime_info(app_context* app_context);
 
 int main(int argc, char **argv) {
-    const char* first_vu_meter=NULL;
-
     struct App app = {
         .context = {
             .renderer = NULL,
             .window = NULL,
             .max_secs = (Uint32)-1,
             .cycle_secs = (Uint32)-1,
-            .vsync = 0
+            .vsync = 0,
+            .window_title = WINDOW_TITLE,
+            .json_file = json_file,
+            .dump_vu = false,
         },
 //        .keystate = SDL_GetKeyboardState(NULL),
     };
 
     view_context view = {.app = &app.context, .list=create_widget_list(&view)};
-    bool dump_vu = false;
 
     for(int i = 0; i < argc; ++i) {
         printf("%s ", argv[i]);
@@ -114,7 +111,7 @@ int main(int argc, char **argv) {
         } else if (0 == strcmp(argv[i], "vsync")) {
             app.context.vsync = 1;
         } else if (0 == strcmp(argv[i], "dumpvu")) {
-            dump_vu = true;
+            app.context.dump_vu = true;
         } else if (0 == strcmp(argv[i], "0.0")) {
             app.context.orientation = 0.0;
         } else if (0 == strcmp(argv[i], "180.0")) {
@@ -162,7 +159,7 @@ int main(int argc, char **argv) {
          } else if (0 == strcmp(argv[i], "vu")) {
             if (argc > i+1) {
                 i += 1;
-                first_vu_meter = argv[i];
+                app.context.first_vu_meter = argv[i];
             }
         } else if (0 == strcmp(argv[i], "list") ){
             const vumeter_properties *p = VUMeter_get_props_list();
@@ -180,7 +177,7 @@ int main(int argc, char **argv) {
             }
         } else if (0 == strcmp(argv[i], "json")) {
             if (argc > i+1) {
-                json_file = argv[i+1];
+                app.context.json_file = argv[i+1];
                 i += 1;
             }
         } else if (0 == strcmp(argv[i], "fs") || 0 == strcmp(argv[i], "fullscreen")) {
@@ -224,52 +221,10 @@ int main(int argc, char **argv) {
         app.context.screen_width = 800;
         app.context.screen_height = 480;
     }
-
-    if (app_initialize(&app.context, WINDOW_TITLE)) {
-        app_cleanup(&app.context, EXIT_FAILURE);
-    }
-
-
-    setup_orientation(app.context.orientation, app.context.screen_width, app.context.screen_height, &app.context.window_rect);
-
-    if ( 0 != deserialise_widgets_file(json_file, &view)) {
-        error_printf("failed to deserialise widgets from file %s\n", json_file);
-        exit(EXIT_FAILURE);
-    }
-    for(widget* widget=view.list->head.next; widget->type != WIDGET_END; widget=widget->next) {
-        debug_printf("widget_type:%d %p ", widget->type, widget);
-        debug_printf("rect:{%4d, %4d, %4d, %4d}, ", widget->rect.x, widget->rect.y, widget->rect.w, widget->rect.h);
-        debug_printf("input_rect:{%4d, %4d, %4d, %4d}, ", widget->input_rect.x, widget->input_rect.y, widget->input_rect.w, widget->input_rect.h);
-        debug_printf(" %s\n", widget_type_name(widget->type));
-        debug_printf("     foc=%d highlight=%d hidden=%d hotspot=%d %s\n",
-                (int)widget->focussed,
-                (int)widget_highlight(widget),
-                (int)widget->hidden,
-                (int)widget->hotspot,
-                widget->image_path
-                );
-    }
-   
-    if (dump_vu) {
-        const vumeter_properties* vp = VUMeter_get_props_list();
-        while(vp) {
-            VUMeter_dump_props(vp);
-            vp = vp->next;
-        }
-    }
-    widget_list_load_media(view.list, "./images");
-    for(widget* widget=view.list->head.next; widget != NULL; widget=widget->next) {
-        if (widget->type == WIDGET_VUMETER) {
-            widget_vumeter_select_by_name(widget, first_vu_meter);
-        }
-    }
-
-    print_app_runtime_info(&app.context);
-    SDL_PumpEvents();
+    SDL_Thread* render_thread = SDL_CreateThread((SDL_ThreadFunction)sdl_render_loop, "render", &view);
     SDL_Thread* input_thread = SDL_CreateThread((SDL_ThreadFunction)sdl_input_loop, "input", &view);
-    sdl_render_loop(&view);
     SDL_WaitThread(input_thread, NULL);
-
+    SDL_WaitThread(render_thread, NULL);
     app_cleanup(&app.context, EXIT_SUCCESS);
 
     return 0;

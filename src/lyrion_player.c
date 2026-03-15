@@ -230,6 +230,8 @@ typedef enum {
     CAN_REW = 0x01177ebe3,
     DURATION = 0x004db17a0,
     CAN_SEEK = 0x00e7a46e5,
+    YEAR = 0x0290848a8,
+    ALBUM_OR_REMOTE_TITLE = 0x007d55ca0,
 }player_key_hashv;
 
 typedef struct {
@@ -734,6 +736,7 @@ static bool get_player_status(player_ptr player) {
                 case CAN_REW:
                 case DURATION:
                 case CAN_SEEK:
+                case YEAR:
                     break;
                 
                 case NULL_KEY:
@@ -1270,6 +1273,21 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
         case CAN_SEEK:
             return_value = PFV_INT;
             pfv->integer = player->status.can_seek < 1 ? 0: 1;
+            break;
+        case YEAR:
+            if (player->status.year > 0) {
+                return_value = PFV_INT;
+                pfv->integer =  player->status.year;
+            }
+            break;
+        case ALBUM_OR_REMOTE_TITLE:
+            if (player->status.album) {
+                return_value = PFV_STRINGPTR;
+                pfv->strptr = player->status.album;
+            } else if (player->status.remote_title) {
+                return_value = PFV_STRINGPTR;
+                pfv->strptr = player->status.remote_title;
+            }
             break;
     }
 #undef PFV_INTVALUE
