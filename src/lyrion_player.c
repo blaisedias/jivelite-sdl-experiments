@@ -210,6 +210,10 @@ typedef enum {
     waitingToPlay = 0x02e3ef240,
     isClassical = 0x0157b941d,
 
+    playlist_name = 0x014b00b23,
+    playlist_modified = 0x030b9954c,
+    playlist_id = 0x03584a535,
+
     VOLUME = 0x022fa5670,
     ARTIST = 0x013d3211e,
     TITLE = 0x027895b9d,
@@ -714,7 +718,12 @@ static bool get_player_status(player_ptr player) {
                 case use_volume_control:
                 case remoteMeta:
                 case bpm:
+
+                case playlist_name:
+                case playlist_modified:
+                case playlist_id:
                     break;
+
                 // pseudo tokens 
                 case VOLUME:
                 case ARTIST:
@@ -1111,6 +1120,9 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
         case use_volume_control:
         case remoteMeta:
         case bpm:
+        case playlist_name:
+        case playlist_modified:
+        case playlist_id:
             puts("????????????");
             break;
         
