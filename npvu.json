@@ -293,7 +293,7 @@
                 "location": {
                     "position": {
                         "x": 50,
-                        "y": -90,
+                        "y": -100,
                         "w": -50,
                         "h": 50
                     }
@@ -320,7 +320,7 @@
                 },
                 "range": {
                     "start": 0,
-                    "end": 100
+                    "end": 0
                 },
                 "action": "seek",
                 "player_range_value" : "DURATION",
