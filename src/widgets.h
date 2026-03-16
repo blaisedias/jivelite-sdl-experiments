@@ -1,6 +1,8 @@
 #ifndef __jl_widgets_h_
 #define __jl_widgets_h_
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
+
 #include "util.h"
 #include "actions.h"
 #include "types.h"
@@ -15,6 +17,7 @@ typedef enum {
     WIDGET_MULTISTATE_BUTTON,
     WIDGET_VUMETER,
     WIDGET_SLIDER,
+    WIDGET_TEXT,
     WIDGET_END
 }widget_type;
   
@@ -154,6 +157,16 @@ struct widget {
             _slider_resource res[SLIDER_RESOURCE_COUNT];
             _slider_workspace wk;
         }slider;
+        struct {
+            texture_id_t texture_id;
+            TTF_Font* font;
+            const char* name;   // name is used for texture cache
+            const char* format; // player format string, can be NULL
+            const char* content;
+            SDL_Rect content_dim;
+            SDL_Color colour;
+            SDL_Rect text_rect;
+        }text;
     }sub;
 };
 
@@ -212,6 +225,12 @@ widget *widget_slider_get_value(widget* wdgt, int* value);
 widget *widget_slider_image_paths(widget* , slider_resource_ID id, const char* path1, const char* path2);
 widget *widget_slider_image_width(widget* , slider_resource_ID id, int width);
 widget *widget_slider_image_height(widget* , slider_resource_ID id, int height);
+
+widget* widget_create_text(const view_context*);
+widget* widget_text_set_format(widget*, const char* format);
+widget* widget_text_set_content(widget*, const char* content);
+widget* widget_text_set_font(widget*, const char* font_path, int size);
+widget* widget_text_set_colour(widget*, SDL_Color colour);
 
 struct widget_list {
     widget head;

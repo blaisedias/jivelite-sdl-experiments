@@ -24,11 +24,70 @@
             }
         },
         {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": 50,
+                        "w": -50,
+                        "y": 0,
+                        "h": 65
+                    }
+                },
+                "content": "title",
+                "format": "[{disc}.][{tracknum:02} • ]{TITLE}",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 48,
+                "colour": {
+                    "green" : 255
+                }
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": 50,
+                        "w": -50,
+                        "y": 65,
+                        "h": 40
+                    }
+                },
+                "content": "artist album year",
+                "format": "[{ARTIST} • ][{ALBUM_OR_REMOTE_TITLE} ][({YEAR})]",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 30,
+                "colour": {
+                    "red" : 255,
+                    "green" : 255
+                }
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": 50,
+                        "w": -50,
+                        "y": 376,
+                        "h": 25
+                    }
+                },
+                "content": "audio meta data",
+                "format": "[{PLAYLIST_CURRENT}/][{playlist_tracks}][ • {GENRES}][ • {type}][ • {bitrate}][ • {samplerate} Hz][ • {samplesize} bits]",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 14,
+                "colour": {
+                    "green" : 255,
+                    "blue" : 255
+                }
+            }
+        },
+        {
             "vumeter": {
                 "location": {
                     "position": {
-                        "y": 50,
-                        "h": -50
+                        "y": 110,
+                        "h": 256
                     }
                 },
                 "select" : "PurpleTastic2Transparent"

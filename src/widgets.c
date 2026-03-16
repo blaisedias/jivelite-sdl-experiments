@@ -25,6 +25,18 @@ static char* widget_type_strings[] = {
     "none"
 };
 
+static unsigned text_widget_id = 1;
+static void text_render_surface(widget* wdgt);
+
+static inline void free_ex(void** tgt) {
+    if (*tgt) {
+        free(*tgt);
+    }
+    *tgt = NULL;
+}
+
+#define FREE(x) free_ex((void **)(&x))
+
 bool widget_highlight(widget* wdgt) {
     return  __atomic_load_n(&wdgt->atomic_highlight, __ATOMIC_ACQUIRE);
 }
@@ -57,7 +69,7 @@ void _show_draw_rect(widget* wdgt) {
         SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
-        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 64, 32);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 64, 128);
         SDL_RenderDrawRect(wdgt->view->app->renderer, &draw_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
@@ -68,7 +80,7 @@ void _show_input_rect(widget* wdgt) {
         SDL_Rect input_rect;
         copyRect(&wdgt->input_rect, &input_rect);
         translate_draw_rect(&input_rect);
-        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 0, 0, 32);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 0, 0, 128);
         SDL_RenderDrawRect(wdgt->view->app->renderer, &input_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
@@ -79,7 +91,7 @@ static void button_widget_render(widget* wdgt) {
         SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
-        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 16);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 128);
         SDL_RenderFillRect(wdgt->view->app->renderer, &draw_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
@@ -200,6 +212,17 @@ widget* widget_load_media(widget* wdgt, const char* resource_path) {
                                  error_printf("widget_load_media: slider failed to load %d %s\n", ix, wdgt->sub.slider.res[ix].image_paths[ix_img]);
                             }
                         }
+                    }
+                }
+                break;
+            case WIDGET_TEXT:
+                {
+                    wdgt->sub.text.texture_id = tcache_create_entry(wdgt->sub.text.name);
+                    if (wdgt->sub.text.texture_id) {
+                        tcache_lock_texture(wdgt->sub.text.texture_id);
+                        text_render_surface(wdgt);
+                    } else {
+                        error_printf("widget_load_media: text failed to create texture_idd %s\n", wdgt->sub.text.name);
                     }
                 }
                 break;
@@ -370,6 +393,16 @@ widget* widget_destroy(widget* wdgt) {
                     }
                 }
                 break;
+            case WIDGET_TEXT:
+                tcache_unlock_texture(wdgt->sub.text.texture_id);
+                FREE(wdgt->sub.text.name);
+                FREE(wdgt->sub.text.content);
+                FREE(wdgt->sub.text.format);
+                if (wdgt->sub.text.font) {
+                    TTF_CloseFont(wdgt->sub.text.font);
+                    wdgt->sub.text.font = NULL;
+                }
+                break;
         }
         if (wdgt->player_value_key) {
             free((void *)wdgt->player_value_key);
@@ -493,7 +526,7 @@ static void multistate_button_widget_render(widget* wdgt) {
     SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
-        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 16);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 128);
         SDL_RenderFillRect(wdgt->view->app->renderer, &draw_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
@@ -908,6 +941,121 @@ widget *widget_slider_get_value(widget* wdgt, int* value) {
     return wdgt;
 }
 
+static void text_widget_render(widget* wdgt) {
+    if (widget_pressed(wdgt)&& !wdgt->hotspot) {
+        SDL_Rect draw_rect;
+        copyRect(&wdgt->rect, &draw_rect);
+        translate_draw_rect(&draw_rect);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 128);
+        SDL_RenderFillRect(wdgt->view->app->renderer, &draw_rect);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
+    }
+    if (widget_highlight(wdgt) && wdgt->hotspot == false && show_rects) {
+        _show_draw_rect(wdgt);
+    }
+    if (widget_highlight(wdgt) && show_input_rects) {
+        _show_input_rect(wdgt);
+    }
+    if (wdgt->hotspot == false || widget_highlight(wdgt))  {
+        SDL_Rect image_rect;
+        copyRect(&wdgt->sub.text.text_rect, &image_rect);
+        translate_image_rect(&image_rect);
+        SDL_RenderCopyEx(wdgt->view->app->renderer,
+                tcache_quick_get_texture(wdgt->sub.text.texture_id, wdgt->view->app->renderer),
+                NULL,
+                &image_rect, wdgt->view->app->orientation, NULL, flip);
+    }
+}
+
+widget* widget_create_text(const view_context* view) {
+    widget* wdgt = widget_create(view);
+    if (wdgt) {
+        static SDL_Color white = {255, 255, 255, 255};
+        *((widget_type*)&wdgt->type) = WIDGET_TEXT;
+        wdgt->action = ACTION_NONE;
+        wdgt->render = text_widget_render;
+        char buffer[64];
+        sprintf(buffer, "\\-text-%x-\\", __atomic_fetch_add(&text_widget_id, 1, __ATOMIC_ACQ_REL));
+        wdgt->sub.text.name = strdup(buffer);
+        wdgt->sub.text.content = strdup("");
+        wdgt->sub.text.colour = white;
+    }
+    return wdgt;
+}
+
+widget* widget_text_set_format(widget* wdgt, const char* format) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        if (wdgt->sub.text.format) {
+            free((void *)wdgt->sub.text.format);
+            wdgt->sub.text.format = NULL;
+        }
+        wdgt->sub.text.format = strdup(format);
+    }
+    return wdgt;
+}
+
+static void text_render_surface(widget* wdgt) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        wdgt->sub.text.content_dim.w = wdgt->sub.text.content_dim.h = 0;
+        if (wdgt->sub.text.texture_id) {
+            SDL_Surface *surface = TTF_RenderUTF8_Blended(wdgt->sub.text.font, wdgt->sub.text.content, wdgt->sub.text.colour);
+            if (surface) {
+                tcache_set_surface(wdgt->sub.text.texture_id, surface);
+                wdgt->sub.text.content_dim.w = surface->w;
+                wdgt->sub.text.content_dim.h = surface->h;
+                wdgt->sub.text.text_rect.x = wdgt->rect.x + ((wdgt->rect.w - surface->w)/2);
+                wdgt->sub.text.text_rect.y = wdgt->rect.y + ((wdgt->rect.h - surface->h)/2);
+                wdgt->sub.text.text_rect.w = surface->w;
+                wdgt->sub.text.text_rect.h = surface->h;
+                
+                // for now scale text to fit content.
+                float scale_x = (float)surface->w/wdgt->rect.w;
+                float scale_y = (float)surface->h/wdgt->rect.h;
+                if (scale_x > 1 || scale_y > 1) {
+                    float scale = scale_x > scale_y ? scale_x : scale_y;
+                    int scaled_w = surface->w / scale;
+                    int scaled_h = surface->h / scale;
+                    wdgt->sub.text.text_rect.x = wdgt->rect.x + ((wdgt->rect.w - scaled_w)/2);
+                    wdgt->sub.text.text_rect.y = wdgt->rect.y + ((wdgt->rect.h - scaled_h)/2);
+                    wdgt->sub.text.text_rect.w = scaled_w;
+                    wdgt->sub.text.text_rect.h = scaled_h;
+                }
+            }
+        }
+    }
+}
+
+widget* widget_text_set_content(widget* wdgt, const char* content) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        if (wdgt->sub.text.content) {
+            free((void *)wdgt->sub.text.content);
+            wdgt->sub.text.content = NULL;
+            wdgt->sub.text.content_dim.w = wdgt->sub.text.content_dim.h = 0;
+        }
+        wdgt->sub.text.content = strdup(content);
+        text_render_surface(wdgt);
+    }
+    return wdgt;
+}
+
+widget* widget_text_set_font(widget* wdgt, const char* font_path, int size) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        wdgt->sub.text.font = TTF_OpenFont(font_path, size);
+        if (!wdgt->sub.text.font) {
+            error_printf("failed to create font %s %d %s\n", font_path, size, TTF_GetError());
+        }
+        text_render_surface(wdgt);
+    }
+    return wdgt;
+}
+
+widget* widget_text_set_colour(widget* wdgt, SDL_Color colour) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        wdgt->sub.text.colour = colour;
+    }
+    text_render_surface(wdgt);
+    return wdgt;
+}
 
 static widget_list* widget_list_initialise(widget_list* list, view_context* view) {
     if (list) {

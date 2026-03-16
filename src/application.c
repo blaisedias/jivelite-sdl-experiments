@@ -30,6 +30,7 @@ static uint32_t low_fps_count;
 
 bool app_initialize(app_context* app_ctx, const char* window_title) {
     app_ctx->player = open_local_player(app_ctx->lms);
+    app_ctx->default_font_path = "fonts/FreeSans.ttf";
 
     if (app_ctx->vsync) {
         render_flags |=  SDL_RENDERER_PRESENTVSYNC;
@@ -167,6 +168,9 @@ bool app_initialize(app_context* app_ctx, const char* window_title) {
 //    srand((unsigned)time(NULL));
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
     SDL_RenderSetLogicalSize(app_ctx->renderer, app_ctx->screen_width, app_ctx->screen_height);
+    if (SDL_SetRenderDrawBlendMode(app_ctx->renderer, SDL_BLENDMODE_ADD)) {
+        error_printf("Failed to set renderer blend mode\n");
+    }
 
     printf("pixelFormat: 0x%x %u bytes/pixel ", app_ctx->pixelFormat, app_ctx->bytes_per_pixel);
     switch(app_ctx->pixelFormat) {
@@ -459,15 +463,13 @@ void sdl_input_loop(view_context* view) {
                     if (t->type == WIDGET_SLIDER && 0 == strcmp(t->player_value_key, "time")) {
                         widget_slider_set_interactive(t, can_seek);
                     }
+                    if (t->type == WIDGET_TEXT && t->sub.text.format) {
+                        char buffer[512];
+                        player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
+                        printf("%s\n", buffer);
+                        widget_text_set_content(t, buffer);
+                    }
                 }
-                char buffer[512];
-                player_sprintf(app_ctx->player, buffer, sizeof(buffer), "[{disc}.][{tracknum:02} • ]{TITLE}");
-                printf("%s\n", buffer);
-                player_sprintf(app_ctx->player, buffer, sizeof(buffer), "[{ARTIST} • ][{ALBUM_OR_REMOTE_TITLE} ][({YEAR})]");
-                printf("%s\n", buffer);
-                player_sprintf(app_ctx->player, buffer, sizeof(buffer),
-                        "[{PLAYLIST_CURRENT}/][{playlist_tracks} • ][{GENRES} • ][{type} • ][{bitrate} • ][{samplerate} Hz • ][{samplesize} bits]");
-                printf("%s\n", buffer);
             }
             player_value pvalue;
             get_player_value(app_ctx->player, &pvalue, "VOLUME");

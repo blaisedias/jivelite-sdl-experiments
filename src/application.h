@@ -34,6 +34,7 @@ typedef struct app_context {
     const char*     first_vu_meter;
 
     bool            ready;
+    const char*     default_font_path;
 } app_context;
 
 void app_cleanup(app_context* app, int exit_status);
