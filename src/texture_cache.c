@@ -367,7 +367,7 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* ren
 //        tcache_printf("tcache_quick_get_texture: %d %u %s\n", texture_id, tce->hashv, tce->path);
         __atomic_store_n(&tce->lru_count, lru_counter, __ATOMIC_RELEASE);
 
-        if (tce->texture == NULL && tce->surface != NULL) {
+        if (tce->surface != NULL) {
             int64_t ms_ct_0 =get_micro_seconds();
             SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, tce->surface);
             int64_t ms_ct_1 =get_micro_seconds();
