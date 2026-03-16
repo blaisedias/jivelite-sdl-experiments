@@ -77,7 +77,7 @@ repeat_all				= repeat_2
 <SNIP>
 
  */
-#define SET_READONLY_CHAR_PTR(x) *(const char **)(&(x))
+#define SET_READONLY_CHAR_PTR(x, v) *(const char **)(&(x)) = (v)
 
 int strcmp_ex(const char* const x, const char* const y) {
     if (x == y) return 0;
@@ -283,6 +283,8 @@ typedef struct {
         const char* const   release_type;
         const char* const   remote_title;
         const char* const   mode;
+
+        const char* const   meta_artist;
 
         unsigned char field_set[(BIT_INDEX_END+8)/8];
 
@@ -494,9 +496,13 @@ static char* lms_command(player_ptr player, const char *format, ...) {
 }
 
 static void clear_player_status(player_status_ptr status_ptr) {
+    if(status_ptr->meta_artist) {
+        free((void *)status_ptr->meta_artist);
+        SET_READONLY_CHAR_PTR(status_ptr->meta_artist, NULL);
+    }
     if(status_ptr->status_buffer) {
         free((void *)status_ptr->status_buffer);
-        SET_READONLY_CHAR_PTR(status_ptr->status_buffer) = NULL;
+        SET_READONLY_CHAR_PTR(status_ptr->status_buffer, NULL);
     }
     memset(status_ptr, 0, sizeof(&status_ptr));
  
@@ -532,7 +538,6 @@ static void get_player_volume(player_ptr player) {
 }
 
 static bool get_player_status(player_ptr player) {
-#if 1
 #define  SET_INTVALUE(nm) {\
     int _intval_ = atoi(value); \
     status_changed = status_changed || player->status.nm != _intval_; \
@@ -543,20 +548,9 @@ static bool get_player_status(player_ptr player) {
 #define  SET_STRVALUE(nm) {\
     status_changed = status_changed || player->status.nm == NULL || strcmp(player->status.nm, value); \
     status.field_set[BIT_INDEX_##nm/8] |= 1 << (BIT_INDEX_##nm%8);\
-    SET_READONLY_CHAR_PTR(status.nm) = value; \
+    SET_READONLY_CHAR_PTR(status.nm, value); \
     }
     bool status_changed = false;
-#else  
-#define  SET_INTVALUE(nm) {\
-    int _intval_ = atoi(value); \
-    status.nm = _intval_; \
-    }
-    
-#define  SET_STRVALUE(nm) {\
-    SET_READONLY_CHAR_PTR(status.nm) = value; \
-    }
-    int status_changed = 1;
-#endif
     int cur_index = player->status.playlist_cur_index;
     cur_index = cur_index < 0 ? 0 : cur_index;
     player_status status;
@@ -565,7 +559,7 @@ static bool get_player_status(player_ptr player) {
         char* p = lms_compound_query_player(player, "status %d 1 tags:aAACGNQliImoqrtyTXY duration", cur_index);
         deescape(p);
         clear_player_status(&status);
-        SET_READONLY_CHAR_PTR(status.status_buffer) = strdup(p);
+        SET_READONLY_CHAR_PTR(status.status_buffer, strdup(p));
         char *n = (char *)(status.status_buffer);
         while(n) {
             char *key = splitn(n, &n);
@@ -762,6 +756,18 @@ static bool get_player_status(player_ptr player) {
     if (status_changed) {
         clear_player_status(&player->status);
         memcpy(&player->status, &status, sizeof(player_status));
+        const char* artiste = player->status.artist ? player->status.artist : player->status.trackartist;
+        if (artiste) {
+            if (player->status.albumartist && strcmp(artiste, player->status.albumartist)) {
+                char buffer[511];
+                snprintf(buffer, sizeof(buffer), "%s, %s", player->status.albumartist, artiste);
+                SET_READONLY_CHAR_PTR(player->status.meta_artist, strdup(buffer));
+            }
+        } else {
+            if (player->status.albumartist) {
+                SET_READONLY_CHAR_PTR(player->status.meta_artist, strdup(player->status.albumartist));
+            }
+        }
     } else {
         clear_player_status(&status);
     }
@@ -1133,7 +1139,9 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
                 pfv->integer = player->volume;
             }break;
         case ARTIST:
-            if (player->status.artist) {
+            if (player->status.meta_artist) {
+                PFV_STRVALUE(meta_artist);
+            } else if (player->status.artist) {
                 PFV_STRVALUE(artist);
             } else if (player->status.trackartist) {
                 PFV_STRVALUE(trackartist);
