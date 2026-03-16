@@ -29,6 +29,8 @@ static uint32_t render_iters;
 static uint32_t low_fps_count;
 
 bool app_initialize(app_context* app_ctx, const char* window_title) {
+    app_ctx->player = open_local_player(app_ctx->lms);
+
     if (app_ctx->vsync) {
         render_flags |=  SDL_RENDERER_PRESENTVSYNC;
     }
@@ -395,7 +397,6 @@ void sdl_input_loop(view_context* view) {
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
     bool ignore_SDL_FINGER = 0 == start_touch_screen_event_generator(NULL);
     uint32_t iters=0;
-    ((app_context *)app_ctx)->player = open_local_player(app_ctx->lms);
     player_transient_state pts;
 
     while (input_loop) {
