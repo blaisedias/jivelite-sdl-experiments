@@ -51,6 +51,7 @@ static void action_lock_vumeter(widget* wdgt) {
         }
         w = w->next;
     }
+    widget_multistate_button_set_state(wdgt, 1);
 }
 
 static void action_unlock_vumeter(widget* wdgt) {
@@ -61,6 +62,7 @@ static void action_unlock_vumeter(widget* wdgt) {
         }
         w = w->next;
     }
+    widget_multistate_button_set_state(wdgt, 0);
 }
 
 static void action_lock_visu(widget* wdgt) {
