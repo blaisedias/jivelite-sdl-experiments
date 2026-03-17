@@ -1062,17 +1062,10 @@ widget* widget_text_set_font(widget* wdgt, const char* font_path, int size) {
 widget* widget_text_set_colour(widget* wdgt, SDL_Color colour) {
     if (wdgt && wdgt->type == WIDGET_TEXT) {
         _text_data_ptr txt_w = &wdgt->sub.text;
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN        
-        txt_w->colour.r = colour.a;
-        txt_w->colour.g = colour.b;
-        txt_w->colour.b = colour.g;
-        txt_w->colour.a = colour.r;
-#else
         txt_w->colour.r = colour.r;
         txt_w->colour.g = colour.g;
         txt_w->colour.b = colour.b;
         txt_w->colour.a = colour.a;
-#endif
     }
     text_render_surface(wdgt);
     return wdgt;

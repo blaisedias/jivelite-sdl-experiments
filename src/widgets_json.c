@@ -528,10 +528,10 @@ static void deserialise_one_widget(json_value* value, view_context* ctx) {
                 json_value* jcolour = get_object_object_value(value, JT_TEXT_COLOUR);
                 if (jcolour) {
                     SDL_Color sdlcolour = { 0, 0, 0, 255};
-                    sdlcolour.r =  get_scaled_object_int_value(jcolour, JT_RED, 0);
-                    sdlcolour.g =  get_scaled_object_int_value(jcolour, JT_GREEN, 0);
-                    sdlcolour.b =  get_scaled_object_int_value(jcolour, JT_BLUE, 0);
-                    sdlcolour.a =  get_scaled_object_int_value(jcolour, JT_ALPHA, 255);
+                    sdlcolour.r =  get_object_int_value(jcolour, JT_RED, 0);
+                    sdlcolour.g =  get_object_int_value(jcolour, JT_GREEN, 0);
+                    sdlcolour.b =  get_object_int_value(jcolour, JT_BLUE, 0);
+                    sdlcolour.a =  get_object_int_value(jcolour, JT_ALPHA, 255);
                     widget_text_set_colour(widget, sdlcolour);
                 }
             }break;
