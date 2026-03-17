@@ -68,7 +68,7 @@
                     "position": {
                         "x": 50,
                         "w": -50,
-                        "y": 376,
+                        "y": -104,
                         "h": 25
                     }
                 },
@@ -87,7 +87,7 @@
                 "location": {
                     "position": {
                         "y": 110,
-                        "h": 256
+                        "h": -114
                     }
                 },
                 "select" : "PurpleTastic2Transparent"
@@ -98,7 +98,7 @@
                 "location": {
                     "container": {
                         "x": 0,
-                        "y": 50,
+                        "y": 110,
                         "w": 0,
                         "h": -50
                     },
@@ -174,7 +174,7 @@
             "button": {
                 "location": {
                     "position": {
-                        "x": 20,
+                        "x": 10,
                         "y": -60,
                         "w": 50,
                         "h": 50
@@ -189,7 +189,7 @@
             "multistate_button": {
                 "location": {
                     "position": {
-                        "x": 90,
+                        "x": 80,
                         "y": -60,
                         "w": 50,
                         "h": 50
@@ -216,7 +216,7 @@
             "button": {
                 "location": {
                     "position": {
-                        "x": 160,
+                        "x": 150,
                         "y": -60,
                         "w": 50,
                         "h": 50
@@ -231,7 +231,7 @@
             "button": {
                 "location": {
                     "position": {
-                        "x": 230,
+                        "x": 220,
                         "y": -60,
                         "w": 50,
                         "h": 50
@@ -245,7 +245,7 @@
             "multistate_button": {
                 "location": {
                     "position": {
-                        "x": 300,
+                        "x": 290,
                         "y": -60,
                         "w": 50,
                         "h": 50
@@ -272,7 +272,7 @@
             "multistate_button": {
                 "location": {
                     "position": {
-                        "x": 370,
+                        "x": 360,
                         "y": -60,
                         "w": 50,
                         "h": 50
@@ -299,7 +299,7 @@
             "button": {
                 "location": {
                     "position": {
-                        "x": 440,
+                        "x": 430,
                         "y": -60,
                         "w": 50,
                         "h": 50
@@ -313,7 +313,7 @@
             "slider": {
                 "location": {
                     "position": {
-                        "x": 510,
+                        "x": 500,
                         "y": -60,
                         "w": -10,
                         "h": 50
@@ -348,12 +348,54 @@
             }
         },
         {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": 10,
+                        "w": 70,
+                        "y": -100,
+                        "h": 50
+                    }
+                },
+                "content": "start",
+                "format": "[{time}]",
+                "justification": "right",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 18,
+                "colour": {
+                    "green" : 255
+                },
+                "player_value": "time"
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": -80,
+                        "w": 70,
+                        "y": -100,
+                        "h": 50
+                    }
+                },
+                "content": "end",
+                "format": " [{DURATION}]",
+                "justification": "left",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 18,
+                "colour": {
+                    "green" : 255
+                },
+                "player_value": "DURATION"
+            }
+        },
+        {
             "slider": {
                 "location": {
                     "position": {
-                        "x": 50,
+                        "x": 85,
                         "y": -100,
-                        "w": -50,
+                        "w": -85,
                         "h": 50
                     }
                 },
