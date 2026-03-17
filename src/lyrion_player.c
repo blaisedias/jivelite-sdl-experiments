@@ -237,6 +237,7 @@ typedef enum {
     YEAR = 0x0290848a8,
     ALBUM_OR_REMOTE_TITLE = 0x007d55ca0,
     BITRATE = 0x0028894c6,
+    PLAYLIST_TRACKS = 0x03715454c,
 }player_key_hashv;
 
 typedef struct {
@@ -1160,7 +1161,7 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
             }
             break;
         case PLAYLIST_CURRENT:
-            if(player->status.playlist_cur_index > -1) { 
+            if(player->status.playlist_cur_index > -1 && player->status.playlist_tracks > 1) { 
                 return_value = PFV_INT;
                 pfv->integer = player->status.playlist_cur_index+1;
             }
@@ -1317,6 +1318,10 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
                     pfv->strptr = player->status.bitrate;
                 }
             }
+            break;
+        case PLAYLIST_TRACKS:
+            PFV_INTVALUE(playlist_tracks, 1);
+            break;
     }
 #undef PFV_INTVALUE
 #undef PFV_STRVALUE
