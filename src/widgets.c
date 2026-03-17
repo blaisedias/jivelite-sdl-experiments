@@ -1056,10 +1056,12 @@ static void text_render_surface(widget* wdgt) {
 widget* widget_text_set_content(widget* wdgt, const char* content) {
     if (wdgt && wdgt->type == WIDGET_TEXT) {
         _text_data_ptr txt_w = &wdgt->sub.text;
+        if (NULL == content || 0 == strlen(content)) {
+            // empty strings => TTF_Render returns a nil surface,
+            // force change of texture
+            content = " ";
+        }
         if (txt_w->content) {
-            if (!content) {
-                content = "";
-            }
             if (0 == strcmp(content, txt_w->content)) {
                 return wdgt;
             }
