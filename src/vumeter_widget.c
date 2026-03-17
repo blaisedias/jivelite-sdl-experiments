@@ -115,10 +115,12 @@ void vumeter_widget_load_media(widget *wdgt, const char* resource_path) {
     }
 }
 
+extern void _debug_draw_rect(widget* wdgt);
 extern void _show_draw_rect(widget* wdgt);
 extern void _show_input_rect(widget* wdgt);
 
 static void vumeter_render(widget* wdgt) {
+    if (debug_rects) { _debug_draw_rect(wdgt); }
     if (widget_highlight(wdgt)) {
         if (show_rects) { _show_draw_rect(wdgt); }
         if (show_input_rects) { _show_input_rect(wdgt); }

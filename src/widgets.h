@@ -178,6 +178,7 @@ bool widget_pressed(widget* wdgt);
 void widget_set_pressed(widget* wdgt, bool onoff);
 
 
+extern bool debug_rects;
 extern bool show_rects;
 extern bool show_input_rects;
 

@@ -10,6 +10,7 @@
 extern widget *vumeter_widget_destroy(widget *wdgt);
 extern void vumeter_widget_load_media(widget *wdgt, const char* resource_path);
 
+bool debug_rects = false;
 bool show_rects = false;
 bool show_input_rects = false;
 
@@ -36,6 +37,7 @@ static inline void free_ex(void** tgt) {
 }
 
 #define FREE(x) free_ex((void **)(&x))
+#define DEBUG_RECT(w) if (debug_rects) { _debug_draw_rect(w); }
 
 bool widget_highlight(widget* wdgt) {
     return  __atomic_load_n(&wdgt->atomic_highlight, __ATOMIC_ACQUIRE);
@@ -64,6 +66,17 @@ const char* widget_type_name(widget_type typ) {
 void render_none(widget* btn) {
 }
 
+void _debug_draw_rect(widget* wdgt) {
+    if (wdgt) {
+        SDL_Rect draw_rect;
+        copyRect(&wdgt->rect, &draw_rect);
+        translate_draw_rect(&draw_rect);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 255, 0, 0, 128);
+        SDL_RenderDrawRect(wdgt->view->app->renderer, &draw_rect);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
+    }
+}
+
 void _show_draw_rect(widget* wdgt) {
     if (wdgt) {
         SDL_Rect draw_rect;
@@ -87,6 +100,7 @@ void _show_input_rect(widget* wdgt) {
 }
 
 static void button_widget_render(widget* wdgt) {
+    DEBUG_RECT(wdgt);
     if (widget_pressed(wdgt)&& !wdgt->hotspot) {
         SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
@@ -434,6 +448,7 @@ widget* widget_create_button(const view_context* view) {
 }
 
 static void image_widget_render(widget* wdgt) {
+    DEBUG_RECT(wdgt);
     if (widget_highlight(wdgt)) {
         if (show_rects) { _show_draw_rect(wdgt); }
         if (show_input_rects) { _show_input_rect(wdgt); }
@@ -526,6 +541,7 @@ widget* widget_hotspot_edge(widget* wdgt, hotspot_edge edge, SDL_Rect *r) {
 }
 
 static void multistate_button_widget_render(widget* wdgt) {
+    DEBUG_RECT(wdgt);
     if (widget_pressed(wdgt) && !wdgt->hotspot) {
     SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
@@ -676,6 +692,7 @@ static _slider_workspace* slider_widget_init_workspace(widget* wdgt) {
 }
 
 static void slider_widget_render(widget* wdgt) {
+    DEBUG_RECT(wdgt);
     if (widget_highlight(wdgt)) {
         if (show_rects) { _show_draw_rect(wdgt); }
         if (show_input_rects) { _show_input_rect(wdgt); }
@@ -946,6 +963,7 @@ widget *widget_slider_get_value(widget* wdgt, int* value) {
 }
 
 static void text_widget_render(widget* wdgt) {
+    DEBUG_RECT(wdgt);
     _text_data_ptr txt_w = &wdgt->sub.text;
     if (widget_pressed(wdgt)&& !wdgt->hotspot) {
         SDL_Rect draw_rect;
@@ -996,7 +1014,9 @@ widget* widget_text_set_format(widget* wdgt, const char* format) {
             free((void *)txt_w->format);
             txt_w->format = NULL;
         }
-        txt_w->format = strdup(format);
+        if (format) {
+            txt_w->format = strdup(format);
+        }
     }
     return wdgt;
 }
@@ -1037,6 +1057,12 @@ widget* widget_text_set_content(widget* wdgt, const char* content) {
     if (wdgt && wdgt->type == WIDGET_TEXT) {
         _text_data_ptr txt_w = &wdgt->sub.text;
         if (txt_w->content) {
+            if (!content) {
+                content = "";
+            }
+            if (0 == strcmp(content, txt_w->content)) {
+                return wdgt;
+            }
             free((void *)txt_w->content);
             txt_w->content = NULL;
             txt_w->content_dim.w = txt_w->content_dim.h = 0;

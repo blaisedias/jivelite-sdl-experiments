@@ -147,6 +147,8 @@ int main(int argc, char **argv) {
             enable_printf(TEXTURE_CACHE_PRINTF);
         } else if (0 == strcmp(argv[i], "printftcacheeject")) {
             enable_printf(TEXTURE_CACHE_EJECT_PRINTF);
+        } else if (0 == strcmp(argv[i], "debugrects")) {
+            debug_rects = true;
         } else if (0 == strcmp(argv[i], "showrects")) {
             show_rects = true;
         } else if (0 == strcmp(argv[i], "showinputrects")) {
