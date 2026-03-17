@@ -93,6 +93,17 @@ typedef struct {
     SDL_Rect bar_empty_rect;
 }_slider_workspace;
 
+typedef struct {
+    texture_id_t texture_id;
+    TTF_Font* font;
+    const char* name;   // name is used for texture cache
+    const char* format; // player format string, can be NULL
+    const char* content;
+    SDL_Rect content_dim;
+    SDL_Color colour;
+    SDL_Rect dst_rect;
+}_text_data,*_text_data_ptr;
+
 struct widget {
     struct      widget *next;
     struct      widget *prev;
@@ -157,16 +168,7 @@ struct widget {
             _slider_resource res[SLIDER_RESOURCE_COUNT];
             _slider_workspace wk;
         }slider;
-        struct {
-            texture_id_t texture_id;
-            TTF_Font* font;
-            const char* name;   // name is used for texture cache
-            const char* format; // player format string, can be NULL
-            const char* content;
-            SDL_Rect content_dim;
-            SDL_Color colour;
-            SDL_Rect text_rect;
-        }text;
+        _text_data text;
     }sub;
 };
 

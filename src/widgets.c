@@ -217,12 +217,13 @@ widget* widget_load_media(widget* wdgt, const char* resource_path) {
                 break;
             case WIDGET_TEXT:
                 {
-                    wdgt->sub.text.texture_id = tcache_create_entry(wdgt->sub.text.name);
-                    if (wdgt->sub.text.texture_id) {
-                        tcache_lock_texture(wdgt->sub.text.texture_id);
+                    _text_data_ptr txt_w = &wdgt->sub.text;
+                    txt_w->texture_id = tcache_create_entry(txt_w->name);
+                    if (txt_w->texture_id) {
+                        tcache_lock_texture(txt_w->texture_id);
                         text_render_surface(wdgt);
                     } else {
-                        error_printf("widget_load_media: text failed to create texture_idd %s\n", wdgt->sub.text.name);
+                        error_printf("widget_load_media: text failed to create texture_id %s\n", txt_w->name);
                     }
                 }
                 break;
@@ -394,13 +395,16 @@ widget* widget_destroy(widget* wdgt) {
                 }
                 break;
             case WIDGET_TEXT:
-                tcache_unlock_texture(wdgt->sub.text.texture_id);
-                FREE(wdgt->sub.text.name);
-                FREE(wdgt->sub.text.content);
-                FREE(wdgt->sub.text.format);
-                if (wdgt->sub.text.font) {
-                    TTF_CloseFont(wdgt->sub.text.font);
-                    wdgt->sub.text.font = NULL;
+                {
+                    _text_data_ptr txt_w = &wdgt->sub.text;
+                    tcache_unlock_texture(txt_w->texture_id);
+                    FREE(txt_w->name);
+                    FREE(txt_w->content);
+                    FREE(txt_w->format);
+                    if (txt_w->font) {
+                        TTF_CloseFont(txt_w->font);
+                        txt_w->font = NULL;
+                    }
                 }
                 break;
         }
@@ -942,6 +946,7 @@ widget *widget_slider_get_value(widget* wdgt, int* value) {
 }
 
 static void text_widget_render(widget* wdgt) {
+    _text_data_ptr txt_w = &wdgt->sub.text;
     if (widget_pressed(wdgt)&& !wdgt->hotspot) {
         SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
@@ -958,10 +963,10 @@ static void text_widget_render(widget* wdgt) {
     }
     if (wdgt->hotspot == false || widget_highlight(wdgt))  {
         SDL_Rect image_rect;
-        copyRect(&wdgt->sub.text.text_rect, &image_rect);
+        copyRect(&txt_w->dst_rect, &image_rect);
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(wdgt->sub.text.texture_id, wdgt->view->app->renderer),
+                tcache_quick_get_texture(txt_w->texture_id, wdgt->view->app->renderer),
                 NULL,
                 &image_rect, wdgt->view->app->orientation, NULL, flip);
     }
@@ -971,42 +976,45 @@ widget* widget_create_text(const view_context* view) {
     widget* wdgt = widget_create(view);
     if (wdgt) {
         static SDL_Color white = {255, 255, 255, 255};
+        _text_data_ptr txt_w = &wdgt->sub.text;
         *((widget_type*)&wdgt->type) = WIDGET_TEXT;
         wdgt->action = ACTION_NONE;
         wdgt->render = text_widget_render;
         char buffer[64];
         sprintf(buffer, "\\-text-%x-\\", __atomic_fetch_add(&text_widget_id, 1, __ATOMIC_ACQ_REL));
-        wdgt->sub.text.name = strdup(buffer);
-        wdgt->sub.text.content = strdup("");
-        wdgt->sub.text.colour = white;
+        txt_w->name = strdup(buffer);
+        txt_w->content = strdup("");
+        txt_w->colour = white;
     }
     return wdgt;
 }
 
 widget* widget_text_set_format(widget* wdgt, const char* format) {
     if (wdgt && wdgt->type == WIDGET_TEXT) {
-        if (wdgt->sub.text.format) {
-            free((void *)wdgt->sub.text.format);
-            wdgt->sub.text.format = NULL;
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        if (txt_w->format) {
+            free((void *)txt_w->format);
+            txt_w->format = NULL;
         }
-        wdgt->sub.text.format = strdup(format);
+        txt_w->format = strdup(format);
     }
     return wdgt;
 }
 
 static void text_render_surface(widget* wdgt) {
     if (wdgt && wdgt->type == WIDGET_TEXT) {
-        wdgt->sub.text.content_dim.w = wdgt->sub.text.content_dim.h = 0;
-        if (wdgt->sub.text.texture_id) {
-            SDL_Surface *surface = TTF_RenderUTF8_Blended(wdgt->sub.text.font, wdgt->sub.text.content, wdgt->sub.text.colour);
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        txt_w->content_dim.x = txt_w->content_dim.y = txt_w->content_dim.w = txt_w->content_dim.h = 0;
+        if (txt_w->texture_id) {
+            SDL_Surface *surface = TTF_RenderUTF8_Blended(txt_w->font, txt_w->content, txt_w->colour);
             if (surface) {
-                tcache_set_surface(wdgt->sub.text.texture_id, surface);
-                wdgt->sub.text.content_dim.w = surface->w;
-                wdgt->sub.text.content_dim.h = surface->h;
-                wdgt->sub.text.text_rect.x = wdgt->rect.x + ((wdgt->rect.w - surface->w)/2);
-                wdgt->sub.text.text_rect.y = wdgt->rect.y + ((wdgt->rect.h - surface->h)/2);
-                wdgt->sub.text.text_rect.w = surface->w;
-                wdgt->sub.text.text_rect.h = surface->h;
+                tcache_set_surface(txt_w->texture_id, surface);
+                txt_w->content_dim.w = surface->w;
+                txt_w->content_dim.h = surface->h;
+                txt_w->dst_rect.x = wdgt->rect.x + ((wdgt->rect.w - surface->w)/2);
+                txt_w->dst_rect.y = wdgt->rect.y + ((wdgt->rect.h - surface->h)/2);
+                txt_w->dst_rect.w = surface->w;
+                txt_w->dst_rect.h = surface->h;
                 
                 // for now scale text to fit content.
                 float scale_x = (float)surface->w/wdgt->rect.w;
@@ -1015,10 +1023,10 @@ static void text_render_surface(widget* wdgt) {
                     float scale = scale_x > scale_y ? scale_x : scale_y;
                     int scaled_w = surface->w / scale;
                     int scaled_h = surface->h / scale;
-                    wdgt->sub.text.text_rect.x = wdgt->rect.x + ((wdgt->rect.w - scaled_w)/2);
-                    wdgt->sub.text.text_rect.y = wdgt->rect.y + ((wdgt->rect.h - scaled_h)/2);
-                    wdgt->sub.text.text_rect.w = scaled_w;
-                    wdgt->sub.text.text_rect.h = scaled_h;
+                    txt_w->dst_rect.x = wdgt->rect.x + ((wdgt->rect.w - scaled_w)/2);
+                    txt_w->dst_rect.y = wdgt->rect.y + ((wdgt->rect.h - scaled_h)/2);
+                    txt_w->dst_rect.w = scaled_w;
+                    txt_w->dst_rect.h = scaled_h;
                 }
             }
         }
@@ -1027,12 +1035,13 @@ static void text_render_surface(widget* wdgt) {
 
 widget* widget_text_set_content(widget* wdgt, const char* content) {
     if (wdgt && wdgt->type == WIDGET_TEXT) {
-        if (wdgt->sub.text.content) {
-            free((void *)wdgt->sub.text.content);
-            wdgt->sub.text.content = NULL;
-            wdgt->sub.text.content_dim.w = wdgt->sub.text.content_dim.h = 0;
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        if (txt_w->content) {
+            free((void *)txt_w->content);
+            txt_w->content = NULL;
+            txt_w->content_dim.w = txt_w->content_dim.h = 0;
         }
-        wdgt->sub.text.content = strdup(content);
+        txt_w->content = strdup(content);
         text_render_surface(wdgt);
     }
     return wdgt;
@@ -1040,8 +1049,9 @@ widget* widget_text_set_content(widget* wdgt, const char* content) {
 
 widget* widget_text_set_font(widget* wdgt, const char* font_path, int size) {
     if (wdgt && wdgt->type == WIDGET_TEXT) {
-        wdgt->sub.text.font = TTF_OpenFont(font_path, size);
-        if (!wdgt->sub.text.font) {
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        txt_w->font = TTF_OpenFont(font_path, size);
+        if (!txt_w->font) {
             error_printf("failed to create font %s %d %s\n", font_path, size, TTF_GetError());
         }
         text_render_surface(wdgt);
@@ -1051,7 +1061,18 @@ widget* widget_text_set_font(widget* wdgt, const char* font_path, int size) {
 
 widget* widget_text_set_colour(widget* wdgt, SDL_Color colour) {
     if (wdgt && wdgt->type == WIDGET_TEXT) {
-        wdgt->sub.text.colour = colour;
+        _text_data_ptr txt_w = &wdgt->sub.text;
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN        
+        txt_w->colour.r = colour.a;
+        txt_w->colour.g = colour.b;
+        txt_w->colour.b = colour.g;
+        txt_w->colour.a = colour.r;
+#else
+        txt_w->colour.r = colour.r;
+        txt_w->colour.g = colour.g;
+        txt_w->colour.b = colour.b;
+        txt_w->colour.a = colour.a;
+#endif
     }
     text_render_surface(wdgt);
     return wdgt;
