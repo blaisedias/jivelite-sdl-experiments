@@ -490,6 +490,11 @@ void sdl_input_loop(view_context* view) {
                             widget_slider_set_value(t, elapsed);
                         }
                     }
+                    if (t->type == WIDGET_TEXT && 0 == strcmp("time", t->player_value_key)) {
+                        char buffer[512];
+                        player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
+                        widget_text_set_content(t, buffer);
+                    }
                 }
             }
         }
