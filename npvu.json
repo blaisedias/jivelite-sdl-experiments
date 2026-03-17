@@ -73,7 +73,7 @@
                     }
                 },
                 "content": "audio meta data",
-                "format": "[{PLAYLIST_CURRENT}/][{playlist_tracks}][ • {GENRES}][ • {type}][ • {bitrate}][ • {samplerate} Hz][ • {samplesize} bits]",
+                "format": "[{PLAYLIST_CURRENT}/][{playlist_tracks}][ • {GENRES}][ • {type}][ • {BITRATE}][ • {samplerate} Hz][ • {samplesize} bits]",
                 "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
                 "font_size": 14,
                 "colour": {

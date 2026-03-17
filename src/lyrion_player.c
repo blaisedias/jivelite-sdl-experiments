@@ -236,6 +236,7 @@ typedef enum {
     CAN_SEEK = 0x00e7a46e5,
     YEAR = 0x0290848a8,
     ALBUM_OR_REMOTE_TITLE = 0x007d55ca0,
+    BITRATE = 0x0028894c6,
 }player_key_hashv;
 
 typedef struct {
@@ -1309,6 +1310,13 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
                 pfv->strptr = player->status.remote_title;
             }
             break;
+        case BITRATE:
+            if (player->status.bitrate) {
+                if (strcmp("0", player->status.bitrate)) {
+                    return_value = PFV_STRINGPTR;
+                    pfv->strptr = player->status.bitrate;
+                }
+            }
     }
 #undef PFV_INTVALUE
 #undef PFV_STRVALUE
