@@ -1341,6 +1341,24 @@ pfv_type get_player_value(player_ptr player, player_value_ptr pfv, const char *k
     return pft;
 }
 
+static int snprintf_time(char *buff, size_t bufflen, int seconds, bool suppress0) {
+    int wr = 0;
+    if (suppress0 && seconds < 1) {
+        return 0;
+    }
+    int mins = seconds/60;
+    int hours = mins/60;
+    mins = mins%60;
+    int secs = abs(seconds%60);
+    if (hours) {
+        mins = abs(mins);
+        wr = snprintf(buff, bufflen, "%d:%02d:%02d", hours, mins, secs);
+    } else {
+        wr = snprintf(buff, bufflen, "%d:%02d", mins, secs);
+    }
+    return wr;
+}
+
 void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *format) {
     char* pre;
     char* post;
@@ -1381,6 +1399,13 @@ void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *f
     } else { \
         wr = snprintf(pprint, avail, "%s", (str)); \
     } \
+    avail -= wr; \
+    if (avail < 1) goto END; \
+    pprint += wr
+
+
+#define SNPRINTF_TIME(integer, suppress0) \
+    wr = snprintf_time(pprint, avail, (integer), suppress0); \
     avail -= wr; \
     if (avail < 1) goto END; \
     pprint += wr
@@ -1427,7 +1452,17 @@ void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *f
                     break;
                 case PFV_INT:
                     SNPRINTF(pre);
-                    SNPRINTF_INT_FIELD(pfv.integer);
+                    switch(compute_player_hash(tok)){
+                        default:
+                            SNPRINTF_INT_FIELD(pfv.integer);
+                            break;
+                        case DURATION:
+                            SNPRINTF_TIME(pfv.integer, true);
+                            break;
+                        case time:
+                            SNPRINTF_TIME(pfv.integer, false);
+                            break;
+                    }
                     SNPRINTF(post);
                     break;
                 case PFV_STRINGPTR:
@@ -1459,7 +1494,17 @@ void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *f
                     break;
                 case PFV_INT:
                     SNPRINTF(pre);
-                    SNPRINTF_INT_FIELD(pfv.integer);
+                    switch(compute_player_hash(tok)){
+                        default:
+                            SNPRINTF_INT_FIELD(pfv.integer);
+                            break;
+                        case DURATION:
+                            SNPRINTF_TIME(pfv.integer, true);
+                            break;
+                        case time:
+                            SNPRINTF_TIME(pfv.integer, false);
+                            break;
+                    }
                     break;
                 case PFV_STRINGPTR:
                     SNPRINTF(pre);
