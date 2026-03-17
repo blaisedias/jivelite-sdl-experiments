@@ -27,6 +27,25 @@
             "text": {
                 "location": {
                     "position": {
+                        "x": -50,
+                        "w": 50,
+                        "y": 0,
+                        "h": 20
+                    }
+                },
+                "content": "",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 20,
+                "colour": {
+                    "green" : 255
+                },
+                "runtime_value": "fps"
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
                         "x": 50,
                         "w": -50,
                         "y": 0,
@@ -379,7 +398,7 @@
                     }
                 },
                 "content": "end",
-                "format": " [{DURATION}]",
+                "format": "[{DURATION}]",
                 "justification": "left",
                 "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
                 "font_size": 18,

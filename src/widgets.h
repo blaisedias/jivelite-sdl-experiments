@@ -136,6 +136,7 @@ struct widget {
     bool         atomic_pressed;
     const char*  player_value_key;
     const char*  player_range_value_key;
+    const char*  runtime_value_key;
 
     union {
         vumeter_widget* vu;
@@ -188,6 +189,7 @@ const char* widget_type_name(widget_type typ);
 widget* widget_rect(widget *wdgt, const SDL_Rect *rect);
 widget* widget_bounds(widget *wdgt, int x, int y, int w, int h);
 widget* widget_set_player_value_key(widget* wdgt, const char* key);
+widget* widget_set_runtime_value_key(widget* wdgt, const char* key);
 // TODO: fix implicit range start value of 0
 widget* widget_set_player_range_value_key(widget* wdgt, const char* key);
 

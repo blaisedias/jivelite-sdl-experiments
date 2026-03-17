@@ -91,6 +91,7 @@ typedef enum {
 
     JT_PLAYER_VALUE,
     JT_PLAYER_RANGE_VALUE,
+    JT_RUNTIME_VALUE,
 
     JT_END,
 
@@ -150,6 +151,7 @@ static const char* json_token_strings[]= {
 
     "player_value",
     "player_range_value",
+    "runtime_value",
 
     "",
 };
@@ -614,6 +616,7 @@ static void deserialise_one_widget(json_value* value, view_context* ctx) {
         if (get_object_string_value(value, JT_PLAYER_RANGE_VALUE, NULL)) {
             widget_set_player_range_value_key(widget, get_object_string_value(value, JT_PLAYER_RANGE_VALUE, NULL));
         }
+        widget_set_runtime_value_key(widget, get_object_string_value(value, JT_RUNTIME_VALUE, NULL));
         json_printf("     location\n");
         SDL_Rect container = {  -1, -1, -10000, -10000 };
         deserialise_location(get_object_value(value, JT_LOCATION), ctx, &container, widget);

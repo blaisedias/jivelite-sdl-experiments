@@ -35,6 +35,7 @@ typedef struct app_context {
 
     bool            ready;
     const char*     default_font_path;
+    const unsigned  reported_fps;
 } app_context;
 
 void app_cleanup(app_context* app, int exit_status);

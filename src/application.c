@@ -20,6 +20,7 @@
 
 #define HIDE_CURSOR_COUNT  50
 #define IMAGE_FLAGS IMG_INIT_PNG
+#define FPS_SAMPLE_COUNT 60
 
 static SDL_RendererFlags render_flags = SDL_RENDERER_ACCELERATED;
 static int show_cursor = 0;
@@ -27,6 +28,8 @@ static bool input_loop = true;
 static volatile bool render_loop = true;
 static uint32_t render_iters;
 static uint32_t low_fps_count;
+static int64_t acc_fps = 0;
+static unsigned fps_sample_counter = 0;
 
 bool app_initialize(app_context* app_ctx, const char* window_title) {
     app_ctx->player = open_local_player(app_ctx->lms);
@@ -350,6 +353,7 @@ void sdl_render_loop(view_context* view) {
         int64_t ms_6 = get_micro_seconds();
 //        profile_printf("fps=%02lu t=%06lu v=%06lu rt=%06lu wr=%06lu rtwr= rp=%06lu\n",
         int64_t fps = 1000000/(ms_6 - ms_00);
+        acc_fps += fps;
 //        if ( !profile_fps_deviation || (fps < 59 || fps > 61)) {
         if ( !profile_fps_deviation || (fps < 59)) {
             ++low_fps_count;
@@ -385,7 +389,12 @@ void sdl_render_loop(view_context* view) {
         ++render_iters;
         ms_00 = ms_6;
         ms_next += app_ctx->frame_time_micros;
-
+        ++fps_sample_counter;
+        if ( FPS_SAMPLE_COUNT == fps_sample_counter) {
+            *(unsigned *)(&app_ctx->reported_fps) = acc_fps/FPS_SAMPLE_COUNT;
+            acc_fps = 0;
+            fps_sample_counter = 0;
+        }
 //        SDL_ShowCursor(show_cursor != 0 ? SDL_ENABLE : SDL_DISABLE);
     }
     profile_printf("low_fps_count=%u/%u %f\n", low_fps_count, render_iters, (float)low_fps_count*100/render_iters);
@@ -402,6 +411,7 @@ void sdl_input_loop(view_context* view) {
     bool ignore_SDL_FINGER = 0 == start_touch_screen_event_generator(NULL);
     uint32_t iters=0;
     player_transient_state pts;
+    char buffer[512];
 
     while (input_loop) {
         if (iters % 5 == 0) {
@@ -464,9 +474,8 @@ void sdl_input_loop(view_context* view) {
                         widget_slider_set_interactive(t, can_seek);
                     }
                     if (t->type == WIDGET_TEXT && t->sub.text.format) {
-                        char buffer[512];
                         player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
-                        printf("%s\n", buffer);
+                        debug_printf("'%s' -> '%s'\n", t->sub.text.format, buffer);
                         widget_text_set_content(t, buffer);
                     }
                 }
@@ -490,10 +499,19 @@ void sdl_input_loop(view_context* view) {
                             widget_slider_set_value(t, elapsed);
                         }
                     }
-                    if (t->type == WIDGET_TEXT && 0 == strcmp("time", t->player_value_key)) {
-                        char buffer[512];
-                        player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
-                        widget_text_set_content(t, buffer);
+                    if (t->type == WIDGET_TEXT) {
+                        if(0 == strcmp("time", t->player_value_key)) {
+                            player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
+                            widget_text_set_content(t, buffer);
+                        }
+                    }
+                }
+                if (t->runtime_value_key) {
+                    if (t->type == WIDGET_TEXT) {
+                        if(0 == strcmp("fps", t->runtime_value_key)) {
+                            snprintf(buffer, sizeof(buffer), "FPS:%u", app_ctx->reported_fps);
+                            widget_text_set_content(t, buffer);
+                        }
                     }
                 }
             }

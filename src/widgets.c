@@ -315,6 +315,19 @@ widget* widget_set_player_range_value_key(widget* wdgt, const char* key) {
     return wdgt;
 }
 
+widget* widget_set_runtime_value_key(widget* wdgt, const char* key) {
+    if (wdgt) {
+        if (wdgt->runtime_value_key != NULL) {
+            free((void *)wdgt->runtime_value_key);
+            wdgt->runtime_value_key = NULL;
+        }
+        if (key) {
+            wdgt->runtime_value_key = strdup(key);
+        }
+    }
+    return wdgt;
+}
+
 
 widget* widget_action(widget* wdgt, action action) {
     if (wdgt) {
@@ -424,6 +437,9 @@ widget* widget_destroy(widget* wdgt) {
         }
         if (wdgt->player_value_key) {
             free((void *)wdgt->player_value_key);
+        }
+        if (wdgt->runtime_value_key) {
+            free((void *)wdgt->runtime_value_key);
         }
         if (wdgt->player_range_value_key) {
             free((void *)wdgt->player_range_value_key);
