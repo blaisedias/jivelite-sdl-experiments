@@ -412,6 +412,7 @@ void sdl_input_loop(view_context* view) {
     uint32_t iters=0;
     player_transient_state pts;
     char buffer[512];
+    uint64_t sig=0;
 
     while (input_loop) {
         if (iters % 5 == 0) {
@@ -479,6 +480,14 @@ void sdl_input_loop(view_context* view) {
                         widget_text_set_content(t, buffer);
                     }
                 }
+                player_sprintf(app_ctx->player, buffer, sizeof(buffer), "{playlist_cur_index}{TITLE}{ARTIST}{ALBUM_OR_REMOTE_TITLE}");
+                uint64_t new_sig = compute_player_hash(buffer);
+                if (sig && new_sig != sig) {
+                    // TODO only change visualiser if user setting
+                    SDL_Event next_visu_event = {.type = USEREVENT_NEXT_VISU };
+                    SDL_PushEvent(&next_visu_event);
+                }
+                sig = new_sig;
             }
             player_value pvalue;
             get_player_value(app_ctx->player, &pvalue, "VOLUME");
