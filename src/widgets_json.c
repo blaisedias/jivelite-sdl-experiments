@@ -705,6 +705,7 @@ int deserialise_json(const char* json_string, const int len, view_context* ctx) 
             );
     printf("scaling factor = %f\n", scalef);
     deserialise_widgets(value, ctx);
+    json_value_free(value);
     return 0;
 }
 
