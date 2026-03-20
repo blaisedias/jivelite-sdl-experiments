@@ -271,7 +271,7 @@ texture_id_t tcache_create_entry(const char* path) {
             if (unoccupied_tce(tce)) {
                 tce = calloc(1, sizeof(*tce));
                 if (tce == NULL) {
-                    error_printf("tcache_put_texture: Out of memory\n");
+                    error_printf("tcache_create_entry: Out of memory\n");
                     exit(EXIT_FAILURE);
                 }
                 tce->path = strdup(path);

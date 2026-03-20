@@ -589,17 +589,23 @@ static void get_player_volume(player_ptr player) {
 
 static bool get_player_status(player_ptr player) {
 #define  SET_INTVALUE(nm) {\
-    int _intval_ = atoi(value); \
-    status_changed = status_changed || player->status.nm != _intval_; \
-    status.field_set[BIT_INDEX_##nm/8] |= 1 << (BIT_INDEX_##nm%8);\
-    status.nm = _intval_; \
-    }
+    if (value) { \
+        int _intval_ = atoi(value); \
+        status_changed = status_changed || player->status.nm != _intval_; \
+        status.field_set[BIT_INDEX_##nm/8] |= 1 << (BIT_INDEX_##nm%8);\
+        status.nm = _intval_; \
+    } else { \
+        status.nm = -1; \
+    } \
+}
     
 #define  SET_STRVALUE(nm) {\
-    status_changed = status_changed || player->status.nm == NULL || strcmp(player->status.nm, value); \
-    status.field_set[BIT_INDEX_##nm/8] |= 1 << (BIT_INDEX_##nm%8);\
+    if (value) { \
+        status_changed = status_changed || player->status.nm == NULL || strcmp(player->status.nm, value); \
+        status.field_set[BIT_INDEX_##nm/8] |= 1 << (BIT_INDEX_##nm%8);\
+    } \
     SET_READONLY_CHAR_PTR(status.nm, value); \
-    }
+}
     bool status_changed = false;
     int cur_index = player->status.playlist_cur_index;
     cur_index = cur_index < 0 ? 0 : cur_index;
