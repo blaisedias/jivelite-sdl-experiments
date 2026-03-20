@@ -12,6 +12,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 
+#include "timing.h"
 #include "logging.h"
 #include "lyrion_player.h"
 #define PORT 9090
@@ -159,7 +160,7 @@ typedef enum {
     mode = 0x0000256bd, 
     remote = 0x009a9143a, 
     current_title = 0x032d6e841, 
-    time = 0x0000277d3, 
+    elapsed_time = 0x0000277d3,   // hash is for string "time", use elapsed_time to avoid symbol clashes
     rate = 0x000029120, 
     duration = 0x02d9e012e, 
     sync_master = 0x026c55332, 
@@ -248,7 +249,7 @@ typedef struct {
         int     samplerate;
         int     samplesize;
         int     lossless;
-        int     time;
+        int     elapsed_time;
         int     duration;
         int     tracknum;
         int     remote;
@@ -299,20 +300,42 @@ typedef struct local_addr {
 }local_addr;
 
 typedef struct {
-        char cmd_buff[1024];
-        char buffer[4096];
-        int  sockfd;
-        FILE *fp;
+    char cmd_buff[1024];
+    char buffer[4096];
+    int  sockfd;
+    FILE *fp;
+    bool lock;
 }lms_io, *lms_io_ptr;
 
 struct lyrion_player {
+    const char* lms;
     local_addr_ptr lp;
-    const char* id;
+    const char* lms_player_id;
     lms_io io;
     lms_io cmd_io;
     player_status status;
     int volume;
 };
+
+static void lock_io(lms_io_ptr iop) {
+    while(__atomic_test_and_set(&iop->lock, __ATOMIC_ACQ_REL)) {
+        sleep_milli_seconds(1);
+    }
+}
+
+static void unlock_io(lms_io_ptr iop) {
+    __atomic_clear(&iop->lock, __ATOMIC_RELEASE);
+}
+
+static inline void free_ex(void** tgt) {
+    if (*tgt) {
+        free(*tgt);
+    }
+    *tgt = NULL;
+}
+
+#define FREE(x) free_ex((void **)(&x))
+#define ZERO(x) memset((x), 0, sizeof(*(x)))
 
 uint64_t compute_player_hash(const char* s) {
     const int p = 31;
@@ -430,8 +453,10 @@ static int escaped_strlen(const char* str) {
 }
 
 static char* req0(player_ptr player, const char* prefix, const char* suffix, lms_io_ptr io_ptr, const char *format, va_list args) {
-    memset(io_ptr->cmd_buff, 0 , sizeof(io_ptr->cmd_buff));
-    memset(io_ptr->buffer, 0 , sizeof(io_ptr->buffer));
+    char *rv = NULL;
+    lock_io(io_ptr);
+    ZERO(io_ptr->cmd_buff);
+    ZERO(io_ptr->buffer);
     char *p = io_ptr->cmd_buff;
     size_t len = sizeof(io_ptr->cmd_buff);
     if (prefix) {
@@ -446,22 +471,27 @@ static char* req0(player_ptr player, const char* prefix, const char* suffix, lms
     if (w < len - suffixlen - 1) {
         strcat(p, suffix);
         int len = strlen(io_ptr->cmd_buff);
-        send(io_ptr->sockfd, io_ptr->cmd_buff, len, 0);
-        fgets(io_ptr->buffer, sizeof(io_ptr->buffer), io_ptr->fp);
-        int hdr_len = escaped_strlen(io_ptr->cmd_buff) - suffixlen + 1;
-        char* c = io_ptr->buffer + hdr_len;
-        while (*c != 0) {
-            if (*c == '\n' || *c == '\r') {
-                *c = 0;
-                break;
+        if ( 0 < send(io_ptr->sockfd, io_ptr->cmd_buff, len, 0))
+        {
+            fgets(io_ptr->buffer, sizeof(io_ptr->buffer), io_ptr->fp);
+            int hdr_len = escaped_strlen(io_ptr->cmd_buff) - suffixlen + 1;
+            char* c = io_ptr->buffer + hdr_len;
+            while (*c != 0) {
+                if (*c == '\n' || *c == '\r') {
+                    *c = 0;
+                    break;
+                }
+                ++c;
             }
-            ++c;
+            rv = strdup(io_ptr->buffer + hdr_len);
+        } else {
+            error_printf("failed to send data over socket\n");
         }
-        return io_ptr->buffer + hdr_len;
     } else {
         fprintf(stderr, "cmd buff is too small!\n%s\n", io_ptr->cmd_buff);
     }
-    return NULL;
+    unlock_io(io_ptr);
+    return rv;
 }
 
 
@@ -476,7 +506,7 @@ static char* lms_query(player_ptr player, const char *format, ...) {
 static char* lms_query_player(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = req0(player, player->id, " ?\n", &player->io, format, args);
+    char* rv = req0(player, player->lms_player_id, " ?\n", &player->io, format, args);
     va_end(args);
     return rv;
 }
@@ -484,29 +514,27 @@ static char* lms_query_player(player_ptr player, const char *format, ...) {
 static char* lms_compound_query_player(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = req0(player, player->id, "\n", &player->io, format, args);
+    char* rv = req0(player, player->lms_player_id, "\n", &player->io, format, args);
     va_end(args);
     return rv;
 }
 
-static char* lms_command(player_ptr player, const char *format, ...) {
+static void lms_command(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = req0(player, player->id, "\n", &player->cmd_io, format, args);
+    char* rv = req0(player, player->lms_player_id, "\n", &player->cmd_io, format, args);
     va_end(args);
-    return rv;
+    FREE(rv);
 }
 
 static void clear_player_status(player_status_ptr status_ptr) {
     if(status_ptr->meta_artist) {
-        free((void *)status_ptr->meta_artist);
-        SET_READONLY_CHAR_PTR(status_ptr->meta_artist, NULL);
+        FREE(status_ptr->meta_artist);
     }
     if(status_ptr->status_buffer) {
-        free((void *)status_ptr->status_buffer);
-        SET_READONLY_CHAR_PTR(status_ptr->status_buffer, NULL);
+        FREE(status_ptr->status_buffer);
     }
-    memset(status_ptr, 0, sizeof(&status_ptr));
+    ZERO(status_ptr);
  
     status_ptr->playlist_cur_index = -1;
     status_ptr->playlist_index = -1;
@@ -514,7 +542,7 @@ static void clear_player_status(player_status_ptr status_ptr) {
     status_ptr->samplerate = -1;
     status_ptr->samplesize = -1;
     status_ptr->lossless = -1;
-    status_ptr->time = -1;
+    status_ptr->elapsed_time = -1;
     status_ptr->duration = -1;
     status_ptr->tracknum = -1;
     status_ptr->remote = -1;
@@ -537,6 +565,7 @@ static void get_player_volume(player_ptr player) {
     player->volume = -1;
     char *p = lms_query_player(player, "mixer volume");
     player->volume = atoi(p);
+    FREE(p);
 }
 
 static bool get_player_status(player_ptr player) {
@@ -555,8 +584,8 @@ static bool get_player_status(player_ptr player) {
     bool status_changed = false;
     int cur_index = player->status.playlist_cur_index;
     cur_index = cur_index < 0 ? 0 : cur_index;
-    player_status status;
-    memset(&status, 0, sizeof(status));
+    player_status status = {};
+    ZERO(&status);
     do {
         char* p = lms_compound_query_player(player, "status %d 1 tags:aAACGNQliImoqrtyTXY duration", cur_index);
         deescape(p);
@@ -569,9 +598,9 @@ static bool get_player_status(player_ptr player) {
             player_key_hashv keyhashv = compute_player_hash(key);
 //            printf("%s=0x%09lx\n", key, keyhashv);
             switch(keyhashv) {
-                case time:
+                case elapsed_time:
                     // do not flag 
-                    player->status.time = status.time = atoi(value);
+                    player->status.elapsed_time = status.elapsed_time = atoi(value);
                     break;
                 case remote:
                     SET_INTVALUE(remote);
@@ -751,6 +780,7 @@ static bool get_player_status(player_ptr player) {
             }
         }
         cur_index = status.playlist_cur_index;
+        FREE(p);
     } while(status.playlist_cur_index != status.playlist_index);
     for(int ix=0; status_changed == false && ix < sizeof(status.field_set); ++ix) {
         status_changed = status_changed || player->status.field_set[ix] != status.field_set[ix];
@@ -778,7 +808,7 @@ static bool get_player_status(player_ptr player) {
 #undef SET_INTVALUE
 }
 
-static void close_player(player_ptr player) {
+static void __close_player(player_ptr player) {
     if (player->io.fp) {
         fclose(player->io.fp);
         player->io.fp = NULL;
@@ -801,15 +831,13 @@ static void close_player(player_ptr player) {
         free(lp);
         lp = player->lp;
     }
-    if (player->id) {
-        free((char *)player->id);
-        player->id = NULL;
+    if (player->lms_player_id) {
+        FREE(player->lms_player_id);
     }
     clear_player_status(&player->status);
 }
 
-static int open_player(player_ptr player, const char* name) {
-    memset(player, 0 , sizeof(*player));
+static int __open_player(player_ptr player) {
     player->io.sockfd = -1;
     player->cmd_io.sockfd = -1;
 
@@ -819,15 +847,15 @@ static int open_player(player_ptr player, const char* name) {
 
     struct addrinfo hints;
     struct addrinfo *result, *rp;
-    memset(&hints, 0 , sizeof(hints));
+    ZERO(&hints);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE;
 
-    int s = getaddrinfo(name, "9090", &hints, &result);
+    int s = getaddrinfo(player->lms, "9090", &hints, &result);
     if (s != 0) {
         error_printf("getaddrinfo: %s\n", gai_strerror(s));
-        close_player(player);
+        __close_player(player);
         return -1;
     } 
     int serv_addr_set = 0;
@@ -856,12 +884,12 @@ static int open_player(player_ptr player, const char* name) {
     int status =  connect(player->io.sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     if (status < 0) {
         error_printf("Connection failed %d\n", status);
-        close_player(player);
+        __close_player(player);
         return -2;
     }
     player->io.fp = fdopen(player->io.sockfd, "r");
     if (NULL == player->io.fp) {
-        close_player(player);
+        __close_player(player);
         return -3;
     }
 
@@ -873,25 +901,26 @@ static int open_player(player_ptr player, const char* name) {
     status =  connect(player->cmd_io.sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     if (status < 0) {
         error_printf("Connection failed %d\n", status);
-        close_player(player);
+        __close_player(player);
         return -102;
     }
     player->cmd_io.fp = fdopen(player->cmd_io.sockfd, "r");
     if (NULL == player->cmd_io.fp) {
-        close_player(player);
+        __close_player(player);
         return -103;
     }
     
     char *p = lms_query(player, "player count");
     int player_count = -1;
     player_count = atoi(p);
+    FREE(p);
     if (player_count < 1) {
         error_printf("player count = %d\n", player_count);
-        close_player(player);
+        __close_player(player);
         return -6;
     }
    
-    for(int ix=0; ix < player_count && player->id == NULL; ++ix) {
+    for(int ix=0; ix < player_count && player->lms_player_id == NULL; ++ix) {
          p = lms_query(player, "player ip %d", ix);
          char *c = p;
          while(*c != 0) {
@@ -904,17 +933,40 @@ static int open_player(player_ptr player, const char* name) {
          local_addr_ptr lp = player->lp;
          while(lp) {
             if (0 == strcmp(lp->addr, p)) {
+                FREE(p);
                 p = lms_query(player, "player id %d", ix);
-                player->id = strdup(p);
+                player->lms_player_id = strdup(p);
             }
             lp = lp->next;
          }
+        FREE(p);
     }
-    if (player->id == NULL) {
+    if (player->lms_player_id == NULL) {
         error_printf("failed to establish player id\n");
         return -7;
     }
     return 0;
+}
+
+static void close_player(player_ptr player) {
+    if (player) {
+        __close_player(player);
+        FREE(player->lms);
+        ZERO(player);
+    }
+}
+
+static int open_player(player_ptr player, const char* name) {
+    int rv = -1;
+    if (name) {
+        ZERO(player);
+        player->lms = strdup(name);
+        rv = __open_player(player); 
+        if (rv) {
+            FREE(player->lms);
+        }
+    }
+    return rv;
 }
 
 // public interface
@@ -943,7 +995,7 @@ int poll_player(player_ptr player, player_transient_state_ptr ptransient) {
     if (player) {
         get_player_volume(player);
         if (ptransient) {
-            ptransient->elapsed_secs = player->status.time;
+            ptransient->elapsed_secs = player->status.elapsed_time;
             ptransient->volume = player->volume;
         }
         return get_player_status(player);
@@ -984,8 +1036,8 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
     switch(keyhashv) {
         case NULL_KEY:
             break;
-        case time:
-            PFV_INTVALUE(time, -1);
+        case elapsed_time:
+            PFV_INTVALUE(elapsed_time, -1);
             break;
         case remote:
             PFV_INTVALUE(remote, -1);
@@ -1459,7 +1511,7 @@ void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *f
                         case DURATION:
                             SNPRINTF_TIME(pfv.integer, true);
                             break;
-                        case time:
+                        case elapsed_time:
                             SNPRINTF_TIME(pfv.integer, false);
                             break;
                     }
@@ -1501,7 +1553,7 @@ void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *f
                         case DURATION:
                             SNPRINTF_TIME(pfv.integer, true);
                             break;
-                        case time:
+                        case elapsed_time:
                             SNPRINTF_TIME(pfv.integer, false);
                             break;
                     }
@@ -1532,11 +1584,11 @@ void player_volume_nudge(player_ptr player, int delta) {
     player_volume_set(player, volume);
 }
 
-void player_seek(player_ptr player, int time) {
+void player_seek(player_ptr player, int seek_time) {
     if (player->status.can_seek) {
-        time = time < 0 ? 0 : time;
-        if (player->status.duration > 0 && time < player->status.duration) {
-            lms_command(player, "time %d", time);
+        seek_time = seek_time < 0 ? 0 : seek_time;
+        if (player->status.duration > 0 && seek_time < player->status.duration) {
+            lms_command(player, "time %d", seek_time);
         }
     }
 }

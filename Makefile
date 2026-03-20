@@ -30,7 +30,7 @@ else
 	TS_LIB_H = 
 #	gcc -fsanitize=address -fno-omit-frame-pointer -g -O1 -o
 #	TARG_DEFS = -fno-omit-frame-pointer -g -O1 -fsanitize=thread
-	TARG_DEFS = -fno-omit-frame-pointer -g -O1
+#	TARG_DEFS = -fno-omit-frame-pointer -g -O1
 endif
 
 DEFS = $(TARG_DEFS)
@@ -47,12 +47,13 @@ OBJS_DIR = ./obj
 LIB_DIR = ./lib
 LIBS = -lm -lSDL2 -lSDL2_image -lSDL2_ttf -lts 
 
+SANITIZE = 
+SANITIZE =  -fsanitize=leak
 #SANITIZE =  -fsanitize=safe-stack
 #SANITIZE =  -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined
 #SANITIZE =  -fsanitize=memory -fno-omit-frame-pointer -fsanitize=undefined
-SANITIZE = 
 GLOBAL_DEPS = ./Makefile
-CF = -Wall -g $(TARG_CF) $(DEFS) $(SANITIZE)
+CF = -Wall -fno-omit-frame-pointer -g -O1 $(TARG_CF) $(DEFS) $(SANITIZE)
 CCP = g++
 CC = gcc
 CF_PIC = $(CF) -fpic
@@ -164,8 +165,9 @@ $(BIN_DIR)/test_touch: $(OBJS_DIR)/test_touch.o $(OBJS_DIR)/touch_screen.o $(OBJ
 
 # 4. lyrion player test
 #
-$(BIN_DIR)/local_player_test: $(OBJS_DIR)/local_player_test.o $(OBJS_DIR)/lyrion_player.o $(OBJS_DIR)/logging.o
-	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
+$(BIN_DIR)/local_player_test: $(SRC)/local_player_test.c $(SRC)/lyrion_player.c $(SRC)/logging.c $(SRC)/timing.c
+	$(CC) $(CF) -fsanitize=address -fsanitize=undefined -fsanitize=null -fsanitize=alignment -fsanitize=float-cast-overflow \
+		-O1 -o $(@) $^ $(LIBDIRS) $(LIBS)
 
 # directories
 $(BIN_DIR):
