@@ -373,7 +373,7 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* ren
             int64_t ms_ct_1 =get_micro_seconds();
 //            perf_printf("texture_resolve: create_texture: %07.2f millis\n", (float)(ms_ct_1 - ms_ct_0)/1000);
             if (NULL == texture) {
-                error_printf("tcache_quick_get_texture: failed: %s %s\n", texture_id, tce->path, SDL_GetError());
+                error_printf("tcache_quick_get_texture: failed: %d %s %s\n", texture_id, tce->path, SDL_GetError());
                 SDL_ClearError();
             }
             update_texture(tce, texture);
