@@ -77,7 +77,7 @@ all: $(BIN_DIR)/sqvumeter $(SHARED_OBJS) \
 	$(BIN_DIR)/test_tcache \
 	$(BIN_DIR)/test_widgets_json \
 	$(BIN_DIR)/test_touch \
-	$(BIN_DIR)/local_player_test \
+
 
 .PHONY: clean
 
