@@ -31,6 +31,7 @@ else
 #	gcc -fsanitize=address -fno-omit-frame-pointer -g -O1 -o
 #	TARG_DEFS = -fno-omit-frame-pointer -g -O1 -fsanitize=thread
 #	TARG_DEFS = -fno-omit-frame-pointer -g -O1
+	TARG_DEFS = -fsanitize=leak
 endif
 
 DEFS = $(TARG_DEFS)
@@ -48,7 +49,6 @@ LIB_DIR = ./lib
 LIBS = -lm -lSDL2 -lSDL2_image -lSDL2_ttf -lts 
 
 SANITIZE = 
-SANITIZE =  -fsanitize=leak
 #SANITIZE =  -fsanitize=safe-stack
 #SANITIZE =  -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined
 #SANITIZE =  -fsanitize=memory -fno-omit-frame-pointer -fsanitize=undefined
