@@ -317,6 +317,8 @@ struct lyrion_player {
     int volume;
 };
 
+static int reopen_player(player_ptr player);
+
 static void lock_io(lms_io_ptr iop) {
     while(__atomic_test_and_set(&iop->lock, __ATOMIC_ACQ_REL)) {
         sleep_milli_seconds(1);
@@ -452,8 +454,10 @@ static int escaped_strlen(const char* str) {
     return len;
 }
 
-static char* req0(player_ptr player, const char* prefix, const char* suffix, lms_io_ptr io_ptr, const char *format, va_list args) {
-    char *rv = NULL;
+static int __lms_req(player_ptr player, const char* prefix, const char* suffix, lms_io_ptr io_ptr, const char *format, va_list args, char** data_ptr) {
+    // if send fails return value is -1, 
+    int rv = -2;
+    *data_ptr = "";
     lock_io(io_ptr);
     ZERO(io_ptr->cmd_buff);
     ZERO(io_ptr->buffer);
@@ -471,7 +475,8 @@ static char* req0(player_ptr player, const char* prefix, const char* suffix, lms
     if (w < len - suffixlen - 1) {
         strcat(p, suffix);
         int len = strlen(io_ptr->cmd_buff);
-        if ( 0 < send(io_ptr->sockfd, io_ptr->cmd_buff, len, 0))
+        rv = send(io_ptr->sockfd, io_ptr->cmd_buff, len, 0);
+        if ( 0 < rv )
         {
             fgets(io_ptr->buffer, sizeof(io_ptr->buffer), io_ptr->fp);
             int hdr_len = escaped_strlen(io_ptr->cmd_buff) - suffixlen + 1;
@@ -483,7 +488,7 @@ static char* req0(player_ptr player, const char* prefix, const char* suffix, lms
                 }
                 ++c;
             }
-            rv = strdup(io_ptr->buffer + hdr_len);
+            *data_ptr = strdup(io_ptr->buffer + hdr_len);
         } else {
             error_printf("failed to send data over socket\n");
         }
@@ -494,11 +499,25 @@ static char* req0(player_ptr player, const char* prefix, const char* suffix, lms
     return rv;
 }
 
+static char* lms_req(player_ptr player, const char* prefix, const char* suffix, lms_io_ptr io_ptr, const char *format, va_list args) {
+    char* data = NULL;
+    int sent = __lms_req(player, prefix, suffix, io_ptr, format, args, &data);
+    // -2 => command buffer is too small, and we do not expect to send 0 bytes!
+    if (sent > -2 && sent <= 0) {
+        error_printf("send failed, closing and opening player again and retrying\n");
+        reopen_player(player);
+        if (0 >= __lms_req(player, prefix, suffix, io_ptr, format, args, &data)) {
+            error_printf("request failed - after reopening player\n");
+            return NULL;
+        }
+    }
+    return data;
+}
 
 static char* lms_query(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = req0(player, NULL, " ?\n", &player->io, format, args);
+    char* rv = lms_req(player, NULL, " ?\n", &player->io, format, args);
     va_end(args);
     return rv;
 }
@@ -506,7 +525,7 @@ static char* lms_query(player_ptr player, const char *format, ...) {
 static char* lms_query_player(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = req0(player, player->lms_player_id, " ?\n", &player->io, format, args);
+    char* rv = lms_req(player, player->lms_player_id, " ?\n", &player->io, format, args);
     va_end(args);
     return rv;
 }
@@ -514,7 +533,7 @@ static char* lms_query_player(player_ptr player, const char *format, ...) {
 static char* lms_compound_query_player(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = req0(player, player->lms_player_id, "\n", &player->io, format, args);
+    char* rv = lms_req(player, player->lms_player_id, "\n", &player->io, format, args);
     va_end(args);
     return rv;
 }
@@ -522,7 +541,7 @@ static char* lms_compound_query_player(player_ptr player, const char *format, ..
 static void lms_command(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = req0(player, player->lms_player_id, "\n", &player->cmd_io, format, args);
+    char* rv = lms_req(player, player->lms_player_id, "\n", &player->cmd_io, format, args);
     va_end(args);
     FREE(rv);
 }
@@ -954,6 +973,18 @@ static void close_player(player_ptr player) {
         FREE(player->lms);
         ZERO(player);
     }
+}
+
+static int reopen_player(player_ptr player) {
+    const char* lms = player->lms;
+    __close_player(player);
+    ZERO(player);
+    player->lms = lms;
+    int rv = __open_player(player);
+    if (rv) {
+        error_printf("reopen_player failed\n");
+    }
+    return rv;
 }
 
 static int open_player(player_ptr player, const char* name) {
