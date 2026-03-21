@@ -32,6 +32,8 @@ static int64_t acc_fps = 0;
 static unsigned fps_sample_counter = 0;
 
 bool app_initialize(app_context* app_ctx, const char* window_title) {
+    app_ctx->workspace.player_mode = PLAYER_MODE_UNDEFINED;
+
     app_ctx->player = open_local_player(app_ctx->lms);
     app_ctx->default_font_path = "fonts/FreeSans.ttf";
 
@@ -233,33 +235,11 @@ void app_cleanup(app_context* app_ctx, int exit_status) {
     exit(exit_status);
 }
 
-void print_app_runtime_info(app_context* app_ctx) {
-    SDL_RendererInfo info;
-    if (0 == SDL_GetRendererInfo(app_ctx->renderer, &info)) {
-        printf(
-                "Renderer info:\n"
-                "    name=%s\n"
-                "    max_texture_width=%d\n"
-                "    max_texture_height=%d\n",
-                info.name,
-                info.max_texture_width,
-                info.max_texture_height
-               );
-    } else {
-        printf("Failed to retrieve renderer information\n");
-    }
-    printf("display:%dx%d Orientation:%f,  max seconds:%u performance freq:%lu\n",
-           app_ctx->screen_width,
-           app_ctx->screen_height,
-           app_ctx->orientation,
-           app_ctx->max_secs,
-           SDL_GetPerformanceFrequency());
-}
-
-
 void sdl_render_loop(view_context* view) {
     // initialisation {
     app_context* app_ctx = (app_context *)view->app;
+    app_workspace_t* app_wksp = (app_workspace_t*)(&view->app->workspace);
+
     if (app_initialize(app_ctx, app_ctx->window_title)) {
         app_cleanup(app_ctx, EXIT_FAILURE);
     }
@@ -299,7 +279,31 @@ void sdl_render_loop(view_context* view) {
             widget_vumeter_select_by_name(widget, app_ctx->first_vu_meter);
         }
     }
-    print_app_runtime_info(app_ctx);
+    {
+        SDL_RendererInfo info;
+        if (0 == SDL_GetRendererInfo(app_ctx->renderer, &info)) {
+            app_ctx->max_texture_width = info.max_texture_width;
+            app_ctx->max_texture_width = info.max_texture_height;
+            printf(
+                "Renderer info:\n"
+                "    name=%s\n"
+                "    max_texture_width=%d\n"
+                "    max_texture_height=%d\n",
+                info.name,
+                info.max_texture_width,
+                info.max_texture_height
+               );
+        } else {
+            printf("Failed to retrieve renderer information\n");
+        }
+        printf("display:%dx%d Orientation:%f,  max seconds:%u performance freq:%lu\n",
+           app_ctx->screen_width,
+           app_ctx->screen_height,
+           app_ctx->orientation,
+           app_ctx->max_secs,
+           SDL_GetPerformanceFrequency());
+    }
+
     __atomic_store_n(&app_ctx->ready, true, __ATOMIC_RELEASE);
     // initialisation }
  
@@ -391,7 +395,7 @@ void sdl_render_loop(view_context* view) {
         ms_next += app_ctx->frame_time_micros;
         ++fps_sample_counter;
         if ( FPS_SAMPLE_COUNT == fps_sample_counter) {
-            *(unsigned *)(&app_ctx->reported_fps) = acc_fps/FPS_SAMPLE_COUNT;
+            app_wksp->reported_fps = acc_fps/FPS_SAMPLE_COUNT;
             acc_fps = 0;
             fps_sample_counter = 0;
         }
@@ -403,6 +407,8 @@ void sdl_render_loop(view_context* view) {
 
 void sdl_input_loop(view_context* view) {
     const app_context* app_ctx = view->app;
+    // workspace is non const
+    app_workspace_t* app_wksp = (app_workspace_t*)(&view->app->workspace);
     while(__atomic_load_n(&app_ctx->ready, __ATOMIC_ACQUIRE) == 0) {
         sleep_milli_seconds(100);
     }
@@ -488,6 +494,13 @@ void sdl_input_loop(view_context* view) {
                     SDL_PushEvent(&next_visu_event);
                 }
                 sig = new_sig;
+                player_value pv;
+                if (PFV_INT == get_player_value(app_ctx->player, &pv, "MODE")) {
+                    if (app_wksp->player_mode != pv.integer) {
+                        app_wksp->player_mode = pv.integer;
+                        app_wksp->player_mode_start_timestamp = get_milli_seconds();
+                    }
+                }
             }
             player_value pvalue;
             get_player_value(app_ctx->player, &pvalue, "VOLUME");
@@ -518,7 +531,7 @@ void sdl_input_loop(view_context* view) {
                 if (t->runtime_value_key) {
                     if (t->type == WIDGET_TEXT) {
                         if(0 == strcmp("fps", t->runtime_value_key)) {
-                            snprintf(buffer, sizeof(buffer), "FPS:%u", app_ctx->reported_fps);
+                            snprintf(buffer, sizeof(buffer), "FPS:%u", app_wksp->reported_fps);
                             widget_text_set_content(t, buffer);
                         }
                     }

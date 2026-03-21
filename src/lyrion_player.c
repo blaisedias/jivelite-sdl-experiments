@@ -1353,11 +1353,11 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
             if (player->status.mode) {
                 return_value = PFV_INT;
                 if (0 == strcmp("stop", player->status.mode)) {
-                    pfv->integer = 2;
+                    pfv->integer = PLAYER_MODE_STOPPED;
                 } else if (0 == strcmp("play", player->status.mode)) {
-                    pfv->integer = 1;
+                    pfv->integer = PLAYER_MODE_PLAYING;
                 } else if (0 == strcmp("pause", player->status.mode)) {
-                    pfv->integer = 0;
+                    pfv->integer = PLAYER_MODE_PAUSED;
                 }
             } break;
         case CAN_FWD:

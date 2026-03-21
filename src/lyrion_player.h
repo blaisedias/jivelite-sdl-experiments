@@ -30,6 +30,13 @@ typedef union {
     const char* strptr;
 }player_value, *player_value_ptr;
 
+typedef enum {
+    PLAYER_MODE_PAUSED,
+    PLAYER_MODE_PLAYING,
+    PLAYER_MODE_STOPPED,
+    PLAYER_MODE_UNDEFINED
+} player_mode_t;
+
 /*
     for key values see LMS CLI status documentation:
         integer value keys:

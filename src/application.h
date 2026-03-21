@@ -4,6 +4,12 @@
 #include "types.h"
 #include "lyrion_player.h"
 
+typedef struct {
+    unsigned  reported_fps;
+    player_mode_t   player_mode;
+    int64_t         player_mode_start_timestamp;
+} app_workspace_t;
+
 typedef struct app_context {
     float           orientation;
     SDL_Rect        window_rect;
@@ -35,7 +41,11 @@ typedef struct app_context {
 
     bool            ready;
     const char*     default_font_path;
-    const unsigned  reported_fps;
+
+    int             max_texture_width;
+    int             max_texture_height;
+
+    app_workspace_t workspace; 
 } app_context;
 
 void app_cleanup(app_context* app, int exit_status);
