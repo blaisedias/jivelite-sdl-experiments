@@ -246,6 +246,32 @@ void sdl_render_loop(view_context* view) {
 
     setup_orientation(app_ctx->orientation, app_ctx->screen_width, app_ctx->screen_height, &app_ctx->window_rect);
 
+    {
+        SDL_RendererInfo info;
+        if (0 == SDL_GetRendererInfo(app_ctx->renderer, &info)) {
+            app_ctx->max_texture_width = info.max_texture_width;
+            app_ctx->max_texture_width = info.max_texture_height;
+            printf(
+                "Renderer info:\n"
+                "    name=%s\n"
+                "    max_texture_width=%d\n"
+                "    max_texture_height=%d\n",
+                info.name,
+                info.max_texture_width,
+                info.max_texture_height
+               );
+        } else {
+            printf("Failed to retrieve renderer information\n");
+        }
+        printf("display:%dx%d Orientation:%f,  max seconds:%u performance freq:%lu\n",
+           app_ctx->screen_width,
+           app_ctx->screen_height,
+           app_ctx->orientation,
+           app_ctx->max_secs,
+           SDL_GetPerformanceFrequency());
+    }
+
+
     if ( 0 != deserialise_widgets_file(app_ctx->json_file, view)) {
         error_printf("failed to deserialise widgets from file %s\n", app_ctx->json_file);
         exit(EXIT_FAILURE);
@@ -281,31 +307,6 @@ void sdl_render_loop(view_context* view) {
             widget_vumeter_select_by_name(widget, app_ctx->first_vu_meter);
         }
     }
-    {
-        SDL_RendererInfo info;
-        if (0 == SDL_GetRendererInfo(app_ctx->renderer, &info)) {
-            app_ctx->max_texture_width = info.max_texture_width;
-            app_ctx->max_texture_width = info.max_texture_height;
-            printf(
-                "Renderer info:\n"
-                "    name=%s\n"
-                "    max_texture_width=%d\n"
-                "    max_texture_height=%d\n",
-                info.name,
-                info.max_texture_width,
-                info.max_texture_height
-               );
-        } else {
-            printf("Failed to retrieve renderer information\n");
-        }
-        printf("display:%dx%d Orientation:%f,  max seconds:%u performance freq:%lu\n",
-           app_ctx->screen_width,
-           app_ctx->screen_height,
-           app_ctx->orientation,
-           app_ctx->max_secs,
-           SDL_GetPerformanceFrequency());
-    }
-
     __atomic_store_n(&app_ctx->ready, true, __ATOMIC_RELEASE);
     // initialisation }
  
