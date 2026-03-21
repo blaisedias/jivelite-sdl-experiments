@@ -1055,6 +1055,13 @@ static void text_render_surface(widget* wdgt) {
                     if (scaled_surface) {
                         SDL_BlitScaled(surface, NULL, scaled_surface, NULL);
                         SDL_free(surface);
+                        error_printf("text_render_surface: renderer limit: is %d scaling down by %f from %dx%d to %dx%d\n%s\n",
+                                wdgt->view->app->max_texture_width,
+                                scalef,
+                                surface->w, surface->h,
+                                scaled_surface->w, scaled_surface->h,
+                                txt_w->content
+                                );
                         surface = scaled_surface;
                     }
                 }
@@ -1073,6 +1080,12 @@ static void text_render_surface(widget* wdgt) {
                     float scale = scale_x > scale_y ? scale_x : scale_y;
                     int scaled_w = surface->w / scale;
                     int scaled_h = surface->h / scale;
+                    error_printf("text_render_surface: scaling text to fit %f (x=%f,y=%f) from %dx%d to %dx%d\n%s\n",
+                            1/scale, 1/scale_x, 1/scale_y,
+                            surface->w, surface->h,
+                            scaled_w, scaled_h,
+                            txt_w->content
+                            );
                     txt_w->dst_rect.x = wdgt->rect.x + ((wdgt->rect.w - scaled_w)/2);
                     txt_w->dst_rect.y = wdgt->rect.y + ((wdgt->rect.h - scaled_h)/2);
                     txt_w->dst_rect.w = scaled_w;
