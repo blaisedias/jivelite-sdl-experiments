@@ -7,6 +7,9 @@ typedef int  texture_id_t;
 
 void tcache_init(void);
 void tcache_set_renderer_tid(const SDL_threadID);
+// Note: tcache_shutdown is not thread safe, must be called 
+// after ceasing all texture cache activity to release resources
+void tcache_shutdown(void);
 
 // { These functions must be called in the thread that created the renderer
 void tcache_flush_textures(SDL_Renderer* renderer);

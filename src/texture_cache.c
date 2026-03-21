@@ -185,8 +185,8 @@ static void quick_sort_tcache(tcache_entry** tce_arr, int num_elements) {
 
 void tcache_init(void) {
     static bool initialised = false;
-    if (!initialised) {
-        initialised = true;
+    if(false == __atomic_test_and_set(&initialised, __ATOMIC_ACQ_REL)) {
+        debug_printf("tcache_init: initialising texture_cache\n");
         tbl[NUM_TBL_ENTRIES-1] = &empty_tce;
     }
 }
@@ -835,4 +835,17 @@ bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h
 
 void tcache_set_limit(unsigned limit) {
     max_num_texture_bytes = limit;
+}
+
+void tcache_shutdown(void) {
+    for(texture_id_t texture_id=0+1; texture_id < HASHTPRIME; ++texture_id) {
+        tcache_entry* tce = tbl[texture_id];
+        if (tce && tce->surface) {
+            if(check_permitted()) {
+                _delete_texture(texture_id);
+            }
+            SDL_FreeSurface(tce->surface);
+            tce->surface = NULL;
+        }
+    }
 }
