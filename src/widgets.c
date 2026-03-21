@@ -1044,6 +1044,20 @@ static void text_render_surface(widget* wdgt) {
         if (txt_w->texture_id) {
             SDL_Surface *surface = TTF_RenderUTF8_Blended(txt_w->font, txt_w->content, txt_w->colour);
             if (surface) {
+                if (surface->w > wdgt->view->app->max_texture_width) {
+                    // FIXME: 
+                    // width exceeds the texture width supported by the renderer
+                    // for now scale down the surface to match that limit
+                    float scalef = (float)wdgt->view->app->max_texture_width/surface->w;
+                    SDL_Surface *scaled_surface = SDL_CreateRGBSurfaceWithFormat(0,
+                            surface->w*scalef, surface->h*scalef,
+                            SDL_BITSPERPIXEL(wdgt->view->app->pixelFormat), wdgt->view->app->pixelFormat);
+                    if (scaled_surface) {
+                        SDL_BlitScaled(surface, NULL, scaled_surface, NULL);
+                        SDL_free(surface);
+                        surface = scaled_surface;
+                    }
+                }
                 tcache_set_surface(txt_w->texture_id, surface);
                 txt_w->content_dim.w = surface->w;
                 txt_w->content_dim.h = surface->h;
