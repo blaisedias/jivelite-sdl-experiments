@@ -35,7 +35,7 @@
                 },
                 "content": "",
                 "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
-                "font_size": 20,
+                "font_size": 10,
                 "colour": {
                     "green" : 255
                 },
