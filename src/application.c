@@ -251,6 +251,8 @@ void sdl_render_loop(view_context* view) {
         exit(EXIT_FAILURE);
     }
 
+    tcache_init();
+
     for(widget* widget=view->list->head.next; widget->type != WIDGET_END; widget=widget->next) {
         debug_printf("widget_type:%d %p ", widget->type, widget);
         debug_printf("rect:{%4d, %4d, %4d, %4d}, ", widget->rect.x, widget->rect.y, widget->rect.w, widget->rect.h);
@@ -401,6 +403,7 @@ void sdl_render_loop(view_context* view) {
         }
 //        SDL_ShowCursor(show_cursor != 0 ? SDL_ENABLE : SDL_DISABLE);
     }
+    tcache_shutdown();
     profile_printf("low_fps_count=%u/%u %f\n", low_fps_count, render_iters, (float)low_fps_count*100/render_iters);
     debug_printf("*** render loop end ****\n");
 }
