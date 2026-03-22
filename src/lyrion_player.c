@@ -11,11 +11,14 @@
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <netdb.h>
+#include <poll.h>
 
 #include "timing.h"
 #include "logging.h"
 #include "lyrion_player.h"
-#define PORT 9090
+
+#define CLI_PORT 9090
+#define SLIMPROTO_PORT 3483
 
 /*
  * Default.map
@@ -308,6 +311,11 @@ typedef struct {
 }lms_io, *lms_io_ptr;
 
 struct lyrion_player {
+    union {
+        struct sockaddr sock_addr;
+        struct sockaddr_in sin_addr;
+        struct sockaddr_in6 sin6_addr;
+    }server;
     const char* lms;
     local_addr_ptr lp;
     const char* lms_player_id;
@@ -364,7 +372,8 @@ static void get_local_addrs(player_ptr player) {
         if (ifa->ifa_addr == NULL) {
             continue;
         }
-        if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+//        if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+        if (ifa->ifa_addr->sa_family == AF_INET ) {
             char host[NI_MAXHOST];
             int s = getnameinfo(ifa->ifa_addr,
                         (ifa->ifa_addr->sa_family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6),
@@ -862,14 +871,46 @@ static void __close_player(player_ptr player) {
     clear_player_status(&player->status);
 }
 
-static int __open_player(player_ptr player) {
-    player->io.sockfd = -1;
-    player->cmd_io.sockfd = -1;
+static in_addr_t discover_server_ip(int retry, int timeout) {
+    struct sockaddr_in d;
+    struct sockaddr_in s;
+    char *buf;
+    struct pollfd pollinfo;
 
-    get_local_addrs(player);
+    int disc_sock = socket(AF_INET, SOCK_DGRAM, 0);
 
-    struct sockaddr serv_addr;
+    socklen_t enable = 1;
+    setsockopt(disc_sock, SOL_SOCKET, SO_BROADCAST, (const void *)&enable, sizeof(enable));
 
+    buf = "e";
+
+    memset(&d, 0, sizeof(d));
+    d.sin_family = AF_INET;
+    d.sin_port = htons(SLIMPROTO_PORT);
+    d.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
+    pollinfo.fd = disc_sock;
+    pollinfo.events = POLLIN;
+
+    s.sin_addr.s_addr = 0;
+    for(int count = 0; s.sin_addr.s_addr == 0 && count < retry; ++count) {
+        memset(&s, 0, sizeof(s));
+        if (sendto(disc_sock, buf, 1, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
+            error_printf("error sending disovery");
+        }
+
+        if (poll(&pollinfo, 1, timeout) == 1) {
+            char readbuf[10];
+            socklen_t slen = sizeof(s);
+            recvfrom(disc_sock, readbuf, 10, 0, (struct sockaddr *)&s, &slen);
+            debug_printf("got response from: %s:%d", inet_ntoa(s.sin_addr), ntohs(s.sin_port));
+        }
+    }
+    close(disc_sock);
+    return s.sin_addr.s_addr;
+}
+
+static in_addr_t get_server_ip(const char* servername) {
     struct addrinfo hints;
     struct addrinfo *result, *rp;
     ZERO(&hints);
@@ -877,36 +918,53 @@ static int __open_player(player_ptr player) {
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE;
 
-    int s = getaddrinfo(player->lms, "9090", &hints, &result);
+    int s = getaddrinfo(servername, "9090", &hints, &result);
     if (s != 0) {
         error_printf("getaddrinfo: %s\n", gai_strerror(s));
-        __close_player(player);
-        return -1;
+        return 0;
     } 
-    int serv_addr_set = 0;
     for (rp = result; rp != NULL; rp = rp->ai_next) {
         switch(rp->ai_family) {
             case AF_INET:
-            case AF_INET6:
-                memcpy(&serv_addr, rp->ai_addr, sizeof(serv_addr));
-                serv_addr_set = 1;
+                return  ((struct sockaddr_in*)rp->ai_addr)->sin_addr.s_addr;
                 break;
+            case AF_INET6:
             default:
                 error_printf("ignoring address family %d\n", rp->ai_family);
                 break;
         }
     }
     freeaddrinfo(result);
-    if (!serv_addr_set) {
+    return 0;
+}
+
+static int __open_player(player_ptr player) {
+    player->io.sockfd = -1;
+    player->cmd_io.sockfd = -1;
+
+    get_local_addrs(player);
+
+    player->server.sin_addr.sin_family = AF_INET;
+    player->server.sin_addr.sin_port = htons(CLI_PORT),
+    player->server.sin_addr.sin_addr.s_addr = 0;
+
+    if (player->lms) {
+        player->server.sin_addr.sin_addr.s_addr = get_server_ip(player->lms);
+    } else {
+        player->server.sin_addr.sin_addr.s_addr = discover_server_ip(1, 5000);
+    }
+
+    if (player->server.sin_addr.sin_addr.s_addr == 0) {
         error_printf("Failed to find server address\n");
         return -5;
     }
+
     if ((player->io.sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         error_printf("Socket creation error\n");
         return -4;
     }
     
-    int status =  connect(player->io.sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+    int status =  connect(player->io.sockfd, &player->server.sock_addr, sizeof(player->server.sock_addr));
     if (status < 0) {
         error_printf("Connection failed %d\n", status);
         __close_player(player);
@@ -923,7 +981,7 @@ static int __open_player(player_ptr player) {
         return -104;
     }
     
-    status =  connect(player->cmd_io.sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+    status =  connect(player->cmd_io.sockfd, &player->server.sock_addr, sizeof(player->server.sock_addr));
     if (status < 0) {
         error_printf("Connection failed %d\n", status);
         __close_player(player);
@@ -993,19 +1051,6 @@ static int reopen_player(player_ptr player) {
     return rv;
 }
 
-static int open_player(player_ptr player, const char* name) {
-    int rv = -1;
-    if (name) {
-        ZERO(player);
-        player->lms = strdup(name);
-        rv = __open_player(player); 
-        if (rv) {
-            FREE(player->lms);
-        }
-    }
-    return rv;
-}
-
 // public interface
 void player_command(player_ptr player, const char* command) {
     if (player) {
@@ -1016,7 +1061,10 @@ void player_command(player_ptr player, const char* command) {
 player_ptr open_local_player(const char *lms_addr) {
     player_ptr player = calloc(1, sizeof(*player));
     if (player) {
-        int status = open_player(player, lms_addr);
+        if (lms_addr) {
+            player->lms = strdup(lms_addr);
+        }
+        int status = __open_player(player);
         if (status) {
             close_player(player);
             free(player);
