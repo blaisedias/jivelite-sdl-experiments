@@ -105,9 +105,13 @@ void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *f
 
 // lyrion media server player control
 void player_command(player_ptr player, const char* command);
-#define player_play(player) player_command(player, "button play.single")
-#define player_stop(player) player_command(player, "button pause.hold")
-#define player_pause(player) player_command(player, "button pause.single")
+#define player_play(player) player_command(player, "play")
+#define player_stop(player) player_command(player, "stop")
+#define player_pause(player) player_command(player, "pause")
+
+//#define player_play(player) player_command(player, "button play.single")
+//#define player_stop(player) player_command(player, "button pause.hold")
+//#define player_pause(player) player_command(player, "button pause.single")
 #define player_fwd(player) player_command(player, "button fwd.single")
 #define player_rew(player) player_command(player, "button rew.single")
 
