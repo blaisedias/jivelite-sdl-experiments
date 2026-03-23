@@ -6,9 +6,19 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <time.h>
+#include <sys/time.h>
 #include "logging.h"
 
 static void logfprintf(char *format, ...) {
+	struct timeval t;
+	struct tm tm;
+	gettimeofday(&t, NULL);
+	gmtime_r(&t.tv_sec, &tm);
+    fprintf(stdout, "%04d%02d%02d %02d:%02d:%02d.%03ld ",
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+				tm.tm_hour, tm.tm_min, tm.tm_sec,
+				(long)(t.tv_usec / 1000));
 	va_list args;
 	va_start(args, format);
 	vfprintf(stdout, format, args);
@@ -17,6 +27,14 @@ static void logfprintf(char *format, ...) {
 }
 
 void error_printf(char *format, ...) {
+	struct timeval t;
+	struct tm tm;
+	gettimeofday(&t, NULL);
+	gmtime_r(&t.tv_sec, &tm);
+    fprintf(stderr, "%04d%02d%02d %02d:%02d:%02d.%03ld ",
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+				tm.tm_hour, tm.tm_min, tm.tm_sec,
+				(long)(t.tv_usec / 1000));
 	va_list args;
 	va_start(args, format);
 	vfprintf(stderr, format, args);
@@ -37,7 +55,9 @@ void (*scale_printf)(char *format, ...) = dummy_printf;
 void (*input_printf)(char *format, ...) = dummy_printf;
 void (*debug_printf)(char *format, ...) = dummy_printf;
 void (*tcache_printf)(char *format, ...) = dummy_printf;
-void (*frame_perf_printf)(char *format, ...) = dummy_printf;
+void (*tcache_eject_printf)(char *format, ...) = dummy_printf;
+void (*profile_printf)(char *format, ...) = dummy_printf;
+void (*profile_texture_printf)(char *format, ...) = dummy_printf;
 void (*json_printf)(char *format, ...) = dummy_printf;
 void (*action_printf)(char *format, ...) = dummy_printf;
 
@@ -65,8 +85,14 @@ void enable_printf(vu_printf_typ v) {
         case TEXTURE_CACHE_PRINTF:
             tcache_printf = logfprintf;
             break;
-        case FRAME_PERF_PRINTF:
-            frame_perf_printf = logfprintf;
+        case TEXTURE_CACHE_EJECT_PRINTF:
+            tcache_eject_printf = logfprintf;
+            break;
+        case PROFILE_PERF_PRINTF:
+            profile_printf = logfprintf;
+            break;
+        case PROFILE_TEXTURE_PERF_PRINTF:
+            profile_texture_printf = logfprintf;
             break;
         case JSON_PRINTF:
             json_printf = logfprintf;
@@ -100,8 +126,14 @@ void disable_printf(vu_printf_typ v) {
         case TEXTURE_CACHE_PRINTF:
             tcache_printf = dummy_printf;
             break;
-        case FRAME_PERF_PRINTF:
-            frame_perf_printf = dummy_printf;
+        case TEXTURE_CACHE_EJECT_PRINTF:
+            tcache_eject_printf = dummy_printf;
+            break;
+        case PROFILE_PERF_PRINTF:
+            profile_printf = dummy_printf;
+            break;
+        case PROFILE_TEXTURE_PERF_PRINTF:
+            profile_texture_printf = dummy_printf;
             break;
         case JSON_PRINTF:
             json_printf = dummy_printf;

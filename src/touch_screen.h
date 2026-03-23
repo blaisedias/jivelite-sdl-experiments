@@ -1,9 +1,10 @@
-#ifndef __touch_screen_h_
-#define __touch_screen_h_
+#ifndef __jl_touch_screen_h_
+#define __jl_touch_screen_h_
 
 #include <tslib.h>
 
 typedef struct {
+    unsigned  sleeptime;
     void (*up)(int x , int y);
     void (*down)(int x , int y);
     void (*motion)(int x , int y);
@@ -11,4 +12,4 @@ typedef struct {
 
 int touch_screen_service(touch_screen_svc_config* config);
 void stop_touch_screen_service(void);
-#endif
+#endif  // __jl_touch_screen_h_

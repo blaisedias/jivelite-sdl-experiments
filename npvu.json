@@ -24,11 +24,89 @@
             }
         },
         {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": -50,
+                        "w": 50,
+                        "y": 0,
+                        "h": 20
+                    }
+                },
+                "content": "",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 10,
+                "colour": {
+                    "green" : 255
+                },
+                "runtime_value": "fps"
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": 50,
+                        "w": -50,
+                        "y": 0,
+                        "h": 65
+                    }
+                },
+                "content": "title",
+                "format": "[{disc}.][{tracknum:02} • ]{TITLE}",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 48,
+                "colour": {
+                    "green" : 255
+                }
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": 50,
+                        "w": -50,
+                        "y": 65,
+                        "h": 40
+                    }
+                },
+                "content": "artist album year",
+                "format": "[{ARTIST} • ][{ALBUM_OR_REMOTE_TITLE} ][({YEAR})]",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 30,
+                "colour": {
+                    "red" : 255,
+                    "green" : 255
+                }
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": 50,
+                        "w": -50,
+                        "y": -104,
+                        "h": 25
+                    }
+                },
+                "content": "audio meta data",
+                "format": "[{PLAYLIST_CURRENT}/][{PLAYLIST_TRACKS}][ • {GENRES}][ • {type}][ • {BITRATE}][ • {samplerate} Hz][ • {samplesize} bits]",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 14,
+                "colour": {
+                    "green" : 255,
+                    "blue" : 255
+                }
+            }
+        },
+        {
             "vumeter": {
                 "location": {
                     "position": {
-                        "y": 50,
-                        "h": -50
+                        "y": 110,
+                        "h": -114
                     }
                 },
                 "select" : "PurpleTastic2Transparent"
@@ -39,7 +117,7 @@
                 "location": {
                     "container": {
                         "x": 0,
-                        "y": 50,
+                        "y": 110,
                         "w": 0,
                         "h": -50
                     },
@@ -55,11 +133,11 @@
                 "state": 0,
                 "states": [
                     {
-                        "image": "./images/hotspot-pin-offon.png",
+                        "image": "./images/sd/hotspot-pin-offon.png",
                         "action": "lock_visu"
                     },
                     {
-                        "image": "./images/hotspot-pin-onoff.png",
+                        "image": "./images/sd/hotspot-pin-onoff.png",
                         "action": "unlock_visu"
                     }
                 ]
@@ -83,7 +161,7 @@
                 },
                 "hotspot": true,
                 "hotspot_edge": "right",
-                "image": "./images/hotspot-arrow_forward.png",
+                "image": "./images/sd/hotspot-arrow_forward.png",
                 "action": "next_visu"
             }
         },
@@ -105,7 +183,7 @@
                 },
                 "hotspot": true,
                 "hotspot_edge": "left",
-                "image": "./images/hotspot-arrow_back.png",
+                "image": "./images/sd/hotspot-arrow_back.png",
                 "action": "prev_visu"
             }
         },
@@ -115,21 +193,22 @@
             "button": {
                 "location": {
                     "position": {
-                        "x": 20,
+                        "x": 10,
                         "y": -60,
                         "w": 50,
                         "h": 50
                     }
                 },
-                "image": "./images/skip-previous.png",
-                "action": "previous-track"
+                "image": "./images/sd/skip-previous.png",
+                "action": "previous-track",
+                "player_value": "CAN_REW"
             }
         },
         {
             "multistate_button": {
                 "location": {
                     "position": {
-                        "x": 90,
+                        "x": 80,
                         "y": -60,
                         "w": 50,
                         "h": 50
@@ -137,41 +216,47 @@
                 },
                 "states": [
                     {
-                        "image": "./images/play-circle.png",
+                        "image": "./images/sd/play-circle.png",
+                        "action": "play"
+                    },
+                    {
+                        "image": "./images/sd/pause-circle.png",
                         "action": "pause"
                     },
                     {
-                        "image": "./images/pause-circle.png",
+                        "image": "./images/sd/play-circle.png",
                         "action": "play"
                     }
-                ]
+                ],
+                "player_value": "MODE"
             }
         },
         {
             "button": {
                 "location": {
                     "position": {
-                        "x": 160,
+                        "x": 150,
                         "y": -60,
                         "w": 50,
                         "h": 50
                     }
                 },
-                "image": "./images/skip-next.png",
-                "action": "next-track"
+                "image": "./images/sd/skip-next.png",
+                "action": "next-track",
+                "player_value": "CAN_FWD"
             }
         },
         {
             "button": {
                 "location": {
                     "position": {
-                        "x": 230,
+                        "x": 220,
                         "y": -60,
                         "w": 50,
                         "h": 50
                     }
                 },
-                "image": "./images/stop-circle.png",
+                "image": "./images/sd/stop-circle.png",
                 "action": "stop"
             }
         },
@@ -179,65 +264,67 @@
             "multistate_button": {
                 "location": {
                     "position": {
-                        "x": 300,
+                        "x": 290,
                         "y": -60,
-                        "w": 100,
+                        "w": 50,
                         "h": 50
                     }
                 },
                 "states": [
                     {
-                        "image": "./images/repeat-off-to-once.png",
+                        "image": "./images/sd/repeat-off-5-variant.png",
                         "action": "repeat-once"
                     },
                     {
-                        "image": "./images/repeat-once-to-repeat.png",
+                        "image": "./images/sd/repeat-once-variant.png",
                         "action": "repeat"
                     },
                     {
-                        "image": "./images/repeat-to-repeat-off.png",
+                        "image": "./images/sd/repeat-variant.png",
                         "action": "repeat-off"
                     }
-                ]
+                ],
+                "player_value": "playlist repeat"
             }
         },
         {
             "multistate_button": {
                 "location": {
                     "position": {
-                        "x": 420,
+                        "x": 360,
                         "y": -60,
-                        "w": 100,
+                        "w": 50,
                         "h": 50
                     }
                 },
                 "states": [
                     {
-                        "image": "./images/shuffle-off-to-on.png",
+                        "image": "./images/sd/shuffle-off.png",
                         "action": "shuffle"
                     },
                     {
-                        "image": "./images/shuffle-on-to-album.png",
+                        "image": "./images/sd/shuffle.png",
                         "action": "shuffle-album"
                     },
                     {
-                        "image": "./images/shuffle-album-to-off.png",
+                        "image": "./images/sd/shuffle-album.png",
                         "action": "shuffle-off"
                     }
-                ]
+                ],
+                "player_value": "playlist shuffle"
             }
         },
         {
             "button": {
                 "location": {
                     "position": {
-                        "x": 540,
+                        "x": 430,
                         "y": -60,
                         "w": 50,
                         "h": 50
                     }
                 },
-                "image": "./images/music-information.png",
+                "image": "./images/sd/music-information.png",
                 "action": "music-information"
             }
         },
@@ -245,37 +332,119 @@
             "slider": {
                 "location": {
                     "position": {
-                        "x": 50,
-                        "y": -90,
-                        "w": -50,
+                        "x": 500,
+                        "y": -60,
+                        "w": -10,
                         "h": 50
                     }
                 },
                 "interactive": true,
-                "bar": {
-                    "image": [
-                        "./images/slider-bar.png",
-                        "./images/slider-bar-empty.png"
-                    ]
-                },
                 "pick": {
-                    "image": "./images/slider-pick-circle.png",
+                    "image": "./images/sd/slider-pick-circle.png",
                     "width": 16,
                     "height": 16
                 },
+                "bar": {
+                    "image": [
+                        "./images/sd/slider-bar.png",
+                        "./images/sd/slider-bar-empty.png"
+                    ]
+                },
                 "bar_start": {
-                    "image": "./images/slider-bar-left-end.png",
+                    "image": "./images/sd/slider-bar-left-end.png",
                     "width": 2
                 },
                 "bar_end": {
-                    "image": "./images/slider-bar-right-end-empty.png",
+                    "image": "./images/sd/slider-bar-right-end-empty.png",
                     "width": 2
                 },
                 "range": {
                     "start": 0,
                     "end": 100
                 },
-                "action": "set-volume-level"
+                "action": "set-volume-level",
+                "player_value" : "VOLUME"
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": 10,
+                        "w": 70,
+                        "y": -100,
+                        "h": 50
+                    }
+                },
+                "content": "start",
+                "format": "[{time}]",
+                "justification": "right",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 18,
+                "colour": {
+                    "green" : 255
+                },
+                "player_value": "time"
+            }
+        },
+        {
+            "text": {
+                "location": {
+                    "position": {
+                        "x": -80,
+                        "w": 70,
+                        "y": -100,
+                        "h": 50
+                    }
+                },
+                "content": "end",
+                "format": "[{DURATION}]",
+                "justification": "left",
+                "font": "fonts/Cooper/ttf/Cooper-Bold.ttf",
+                "font_size": 18,
+                "colour": {
+                    "green" : 255
+                },
+                "player_value": "DURATION"
+            }
+        },
+        {
+            "slider": {
+                "location": {
+                    "position": {
+                        "x": 85,
+                        "y": -100,
+                        "w": -85,
+                        "h": 50
+                    }
+                },
+                "interactive": true,
+                "pick": {
+                    "image": "./images/sd/slider-pick-circle.png",
+                    "width": 16,
+                    "height": 16
+                },
+                "bar": {
+                    "image": [
+                        "./images/sd/slider-bar.png",
+                        "./images/sd/slider-bar-empty.png"
+                    ]
+                },
+                "bar_start": {
+                    "image": "./images/sd/slider-bar-left-end.png",
+                    "width": 2
+                },
+                "bar_end": {
+                    "image": "./images/sd/slider-bar-right-end-empty.png",
+                    "width": 2
+                },
+                "range": {
+                    "start": 0,
+                    "end": 0
+                },
+                "action": "seek",
+                "player_range_value" : "DURATION",
+                "player_value" : "time"
             }
         },
         {
@@ -288,7 +457,7 @@
                         "h": 32
                     }
                 },
-                "image": "./images/close.png",
+                "image": "./images/sd/close.png",
                 "action": "quit"
             }
         }

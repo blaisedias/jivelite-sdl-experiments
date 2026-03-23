@@ -1,5 +1,5 @@
-#ifndef __action_h_
-#define __action_h_
+#ifndef __jl_action_h_
+#define __jl_action_h_
 /*
 void action_quit(widget* wdgt);
 void action_next_visu(widget* wdgt);
@@ -44,16 +44,18 @@ typedef enum {
     ACTION_REPEAT_OFF,
 
     ACTION_SHUFFLE,
-    ACTION_SHUFFE_ALBUM,
+    ACTION_SHUFFLE_ALBUM,
     ACTION_SHUFFLE_OFF,
 
     ACTION_MUSIC_INFORMATION,
 
     ACTION_SET_VOLUME,
 
+    ACTION_SEEK,
+
     ACTION_END,
 } action;
 
 action action_from_string(const char* str);
 const char* action_to_string(action action); 
-#endif
+#endif // __jl_action_h_

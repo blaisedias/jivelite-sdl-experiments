@@ -4,8 +4,8 @@
 ** This file is licensed under BSD. Please see the LICENSE file for details.
 */
 
-#ifndef _VUMETERDEF_H_
-#define _VUMETERDEF_H_
+#ifndef __jl_vumeterdef_h_
+#define __jl_vumeterdef_h_
 #include <SDL2/SDL.h>
 #include "texture_cache.h"
 
@@ -87,4 +87,4 @@ typedef struct vu_props {
     void * handle;
 }vumeter_properties;
 
-#endif
+#endif  // __jl_vumeterdef_h_

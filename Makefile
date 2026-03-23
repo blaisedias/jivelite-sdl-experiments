@@ -28,6 +28,10 @@ ifeq ($(PLATFORM),piCorePlayer)
 else
 	INCLUDE_TSLIB =
 	TS_LIB_H = 
+#	gcc -fsanitize=address -fno-omit-frame-pointer -g -O1 -o
+#	TARG_DEFS = -fno-omit-frame-pointer -g -O1 -fsanitize=thread
+#	TARG_DEFS = -fno-omit-frame-pointer -g -O1
+	TARG_DEFS = -fsanitize=leak
 endif
 
 DEFS = $(TARG_DEFS)
@@ -44,12 +48,12 @@ OBJS_DIR = ./obj
 LIB_DIR = ./lib
 LIBS = -lm -lSDL2 -lSDL2_image -lSDL2_ttf -lts 
 
+SANITIZE = 
 #SANITIZE =  -fsanitize=safe-stack
 #SANITIZE =  -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined
 #SANITIZE =  -fsanitize=memory -fno-omit-frame-pointer -fsanitize=undefined
-SANITIZE = 
 GLOBAL_DEPS = ./Makefile
-CF = -Wall -g $(TARG_CF) $(DEFS) $(SANITIZE)
+CF = -Wall -fno-omit-frame-pointer -g -O1 $(TARG_CF) $(DEFS) $(SANITIZE)
 CCP = g++
 CC = gcc
 CF_PIC = $(CF) -fpic
@@ -58,20 +62,22 @@ CF_SHARED = $(CF) -fpic -shared
 SHARED_OBJS = $(LIB_DIR)/Chevrons.so $(LIB_DIR)/PurpleTastic.so $(LIB_DIR)/TubeD.so
 SQVUMETER_OBJS = \
 		  $(OBJS_DIR)/sqvumeter.o \
-		  $(OBJS_DIR)/eventloop.o \
+		  $(OBJS_DIR)/application.o \
    		  $(OBJS_DIR)/util.o $(OBJS_DIR)/widgets.o $(OBJS_DIR)/actions.o \
-   		  $(OBJS_DIR)/vumeter_widget.o $(OBJS_DIR)/vumeter_util.o $(OBJS_DIR)/visualizer.o $(OBJS_DIR)/vis_vumeter.o \
    		  $(OBJS_DIR)/json.o $(OBJS_DIR)/widgets_json.o \
    		  $(OBJS_DIR)/platform_linux.o $(OBJS_DIR)/logging.o \
    		  $(OBJS_DIR)/city.o $(OBJS_DIR)/texture_cache.o \
 		  $(OBJS_DIR)/touch_screen.o \
 		  $(OBJS_DIR)/touch_screen_sdl2.o \
-   		  $(OBJS_DIR)/timer.o
+   		  $(OBJS_DIR)/timing.o \
+		  $(OBJS_DIR)/lyrion_player.o \
+   		  $(OBJS_DIR)/vumeter_widget.o $(OBJS_DIR)/vumeter_util.o $(OBJS_DIR)/visualizer.o $(OBJS_DIR)/vis_vumeter.o\
 
 all: $(BIN_DIR)/sqvumeter $(SHARED_OBJS) \
 	$(BIN_DIR)/test_tcache \
 	$(BIN_DIR)/test_widgets_json \
-	$(BIN_DIR)/test_touch
+	$(BIN_DIR)/test_touch \
+
 
 .PHONY: clean
 
@@ -130,7 +136,7 @@ $(LIB_DIR)/%.so: $(OBJS_DIR)/%.o | $(LIB_DIR)
 
 # test executables
 # 1. texture cache
-$(BIN_DIR)/test_tcache : $(OBJS_DIR)/test_tcache.o $(OBJS_DIR)/texture_cache.o $(OBJS_DIR)/logging.o $(OBJS_DIR)/city.o | $(BIN_DIR)
+$(BIN_DIR)/test_tcache : $(OBJS_DIR)/test_tcache.o $(OBJS_DIR)/texture_cache.o $(OBJS_DIR)/logging.o $(OBJS_DIR)/city.o $(OBJS_DIR)/timing.o | $(BIN_DIR)
 	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
 
 # 2. json parsing
@@ -146,14 +152,22 @@ TEST_WIDGETS_JSON_OBJS =  \
 	$(OBJS_DIR)/visualizer.o \
 	$(OBJS_DIR)/vis_vumeter.o \
 	$(OBJS_DIR)/city.o $(OBJS_DIR)/texture_cache.o \
+	$(OBJS_DIR)/timing.o \
+	$(OBJS_DIR)/lyrion_player.o \
 	$(OBJS_DIR)/platform_linux.o
 
 $(BIN_DIR)/test_widgets_json : $(OBJS_DIR)/test_widgets_json.o $(TEST_WIDGETS_JSON_OBJS) | $(BIN_DIR)
 	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
 
 # 3. touch screen
-$(BIN_DIR)/test_touch: $(OBJS_DIR)/test_touch.o $(OBJS_DIR)/touch_screen.o
+$(BIN_DIR)/test_touch: $(OBJS_DIR)/test_touch.o $(OBJS_DIR)/touch_screen.o $(OBJS_DIR)/timing.o
 	$(CC) $(CF) -o $(@) $^ $(LIBDIRS) $(LIBS)
+
+# 4. lyrion player test
+#
+$(BIN_DIR)/local_player_test: $(SRC)/local_player_test.c $(SRC)/lyrion_player.c $(SRC)/logging.c $(SRC)/timing.c
+	$(CC) $(CF) -fsanitize=address -fsanitize=undefined -fsanitize=null -fsanitize=alignment -fsanitize=float-cast-overflow \
+		-O1 -o $(@) $^ $(LIBDIRS) $(LIBS)
 
 # directories
 $(BIN_DIR):

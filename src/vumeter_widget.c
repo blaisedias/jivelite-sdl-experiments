@@ -9,7 +9,7 @@
 #include <SDL2/SDL_syswm.h>
 #include <time.h>
 #include "vumeter_util.h"
-#include "types.h"
+#include "application.h"
 #include "widgets.h"
 #include "visualizer.h"
 
@@ -28,9 +28,17 @@ struct vumeter_widget {
         const vumeter* meter;
     } meters[100];
     int num_meters;
-    int meter_indx;
+    int atomic_meter_indx;
     bool locked;
 };
+
+static inline int vumeter_index(vumeter_widget* wdgt) {
+    return  __atomic_load_n(&wdgt->atomic_meter_indx, __ATOMIC_ACQUIRE);
+}
+
+static inline void vumeter_set_index(vumeter_widget* wdgt, int ix) {
+     __atomic_store_n(&wdgt->atomic_meter_indx, ix, __ATOMIC_RELEASE);
+}
 
 const vumeter_properties* VUMeter_get_props_list() {
     return vu_props_list;
@@ -102,16 +110,18 @@ void vumeter_widget_load_media(widget *wdgt, const char* resource_path) {
         }
         base_props = base_props->next;
     }
-    if (!VUMeter_load_media(wdgt->view->app->renderer, vw->meters[vw->meter_indx].props)) {
-        error_printf("failed to load media for %s\n",  vw->meters[vw->meter_indx].props->name);
+    if (!VUMeter_load_media(wdgt->view->app->renderer, vw->meters[vumeter_index(vw)].props)) {
+        error_printf("failed to load media for %s\n",  vw->meters[vumeter_index(vw)].props->name);
     }
 }
 
+extern void _debug_draw_rect(widget* wdgt);
 extern void _show_draw_rect(widget* wdgt);
 extern void _show_input_rect(widget* wdgt);
 
 static void vumeter_render(widget* wdgt) {
-    if (wdgt->highlight) {
+    if (debug_rects) { _debug_draw_rect(wdgt); }
+    if (widget_highlight(wdgt)) {
         if (show_rects) { _show_draw_rect(wdgt); }
         if (show_input_rects) { _show_input_rect(wdgt); }
     }
@@ -121,7 +131,7 @@ static void vumeter_render(widget* wdgt) {
     vumeter_widget* vw = wdgt->sub.vu;
     int vols[2];
     visualizer_vumeter(vols);
-    VUMeter_draw(wdgt->view->app->renderer,vw->meters[vw->meter_indx].props,vw->meters[vw->meter_indx].meter, vols, &draw_rect);
+    VUMeter_draw(wdgt->view->app->renderer,vw->meters[vumeter_index(vw)].props,vw->meters[vumeter_index(vw)].meter, vols, &draw_rect);
 }
 
 widget *widget_create_vumeter(const view_context* view) {
@@ -179,19 +189,18 @@ static bool vumeter_select(widget *wdgt, int indx) {
     if (indx < 0 || indx >= vw->num_meters) {
         return false;
     }
-    vumeter_properties* props = vw->meters[vw->meter_indx].props;
     perf_printf("\n");
-    vw->meter_indx = indx;
-    if (props != vw->meters[vw->meter_indx].props)
+    if (indx != vumeter_index(vw))
     {
         // let texture cache handle release of textures on demand
-        //VUMeter_unload_media(props);
-        props = vw->meters[vw->meter_indx].props;
+        //VUMeter_unload_media(vw->meters[vumeter_index(vw)].props);
+        vumeter_properties* props = vw->meters[indx].props;
         if (!VUMeter_load_media(wdgt->view->app->renderer, props)) {
             exit(EXIT_FAILURE);
         }
     }
-    debug_printf("vumeter: %s\n", vw->meters[vw->meter_indx].meter->name);
+    vumeter_set_index(vw, indx);
+    debug_printf("vumeter: %s\n", vw->meters[vumeter_index(vw)].meter->name);
     return true;
 }
 
@@ -203,7 +212,7 @@ widget *widget_vumeter_select_next(widget *wdgt) {
     if (vw->locked) {
         return wdgt;
     }
-    vumeter_select(wdgt, (vw->meter_indx + 1) % vw->num_meters);
+    vumeter_select(wdgt, (vumeter_index(vw) + 1) % vw->num_meters);
     return wdgt;
 }
 
@@ -215,7 +224,7 @@ widget *widget_vumeter_select_prev(widget *wdgt) {
     if (vw->locked) {
         return wdgt;
     }
-    vumeter_select(wdgt, vw->meter_indx == 0 ? vw->num_meters-1 : vw->meter_indx-1);
+    vumeter_select(wdgt, vumeter_index(vw) == 0 ? vw->num_meters-1 : vumeter_index(vw) - 1);
     return wdgt;
 }
 

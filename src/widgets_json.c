@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <SDL2/SDL.h>
+#include "application.h"
 #include "widgets.h"
 #include "actions.h"
 #include "logging.h"
@@ -19,6 +20,7 @@ static const char* widget_type_strings[] = {
     "multistate_button",
     "vumeter",
     "slider",
+    "text",
     ""
 };
 
@@ -66,6 +68,7 @@ typedef enum {
     JT_RANGE,
     JT_RANGE_START,
     JT_RANGE_END,
+    JT_INTERACTIVE,
 
 // order of bar, pick, bar-start, bar-end should match slider_resource_ID enum
     JT_BAR,
@@ -74,6 +77,21 @@ typedef enum {
     JT_BAR_END,
     JT_WIDTH,
     JT_HEIGHT,
+
+    JT_TEXT_FORMAT,
+    JT_TEXT_CONTENT,
+    JT_TEXT_FONT,
+    JT_TEXT_FONT_SIZE,
+    JT_TEXT_COLOUR,
+
+    JT_RED,
+    JT_GREEN,
+    JT_BLUE,
+    JT_ALPHA,
+
+    JT_PLAYER_VALUE,
+    JT_PLAYER_RANGE_VALUE,
+    JT_RUNTIME_VALUE,
 
     JT_END,
 
@@ -111,6 +129,7 @@ static const char* json_token_strings[]= {
     "range",
     "start",
     "end",
+    "interactive",
 
     "bar",
     "pick",
@@ -118,6 +137,21 @@ static const char* json_token_strings[]= {
     "bar_end",
     "width",
     "height",
+
+    "format",
+    "content",
+    "font",
+    "font_size",
+    "colour",
+
+    "red",
+    "green",
+    "blue",
+    "alpha",
+
+    "player_value",
+    "player_range_value",
+    "runtime_value",
 
     "",
 };
@@ -452,6 +486,7 @@ static void deserialise_one_widget(json_value* value, view_context* ctx) {
         case WIDGET_MULTISTATE_BUTTON:
         case WIDGET_VUMETER:
         case WIDGET_SLIDER:
+        case WIDGET_TEXT:
             break;
         default:
             error_printf("deserialise_one_widget: (default) unknown widget %s\n", widget_typename);
@@ -480,6 +515,27 @@ static void deserialise_one_widget(json_value* value, view_context* ctx) {
                 widget = widget_create_button(ctx);
                 widget_image_path(widget, get_object_string_value(value, JT_IMAGE, NULL));
                 json_printf("     image    %s\n", widget->image_path);
+            }break;
+        case WIDGET_TEXT:
+            {
+                widget = widget_create_text(ctx);
+                widget_text_set_content(widget, get_object_string_value(value, JT_TEXT_CONTENT, NULL));
+                json_printf("     content    %s\n", widget->sub.text.content);
+                widget_text_set_format(widget, get_object_string_value(value, JT_TEXT_FORMAT, NULL));
+                json_printf("     format     %s\n", widget->sub.text.format);
+                int font_size = get_scaled_object_int_value(value, JT_TEXT_FONT_SIZE, 12);
+                widget_text_set_font(widget, get_object_string_value(value, JT_TEXT_FONT, ctx->app->default_font_path), font_size);
+                json_printf("     font       %p\n", widget->sub.text.font);
+                json_printf("     fontsize   %p\n", font_size);
+                json_value* jcolour = get_object_object_value(value, JT_TEXT_COLOUR);
+                if (jcolour) {
+                    SDL_Color sdlcolour = { 0, 0, 0, 255};
+                    sdlcolour.r =  get_object_int_value(jcolour, JT_RED, 0);
+                    sdlcolour.g =  get_object_int_value(jcolour, JT_GREEN, 0);
+                    sdlcolour.b =  get_object_int_value(jcolour, JT_BLUE, 0);
+                    sdlcolour.a =  get_object_int_value(jcolour, JT_ALPHA, 255);
+                    widget_text_set_colour(widget, sdlcolour);
+                }
             }break;
         case WIDGET_MULTISTATE_BUTTON:
             {
@@ -510,6 +566,7 @@ static void deserialise_one_widget(json_value* value, view_context* ctx) {
         case WIDGET_SLIDER:
             {
                 widget = widget_create_slider(ctx);
+                widget_slider_define_interactive(widget, get_object_boolean_value(value, JT_INTERACTIVE, true));
                 {
                     json_value* jrange = get_object_object_value(value, JT_RANGE);
                     if (jrange) {
@@ -555,6 +612,11 @@ static void deserialise_one_widget(json_value* value, view_context* ctx) {
             }break;
     }
     if (widget) {
+        widget_set_player_value_key(widget, get_object_string_value(value, JT_PLAYER_VALUE, NULL));
+        if (get_object_string_value(value, JT_PLAYER_RANGE_VALUE, NULL)) {
+            widget_set_player_range_value_key(widget, get_object_string_value(value, JT_PLAYER_RANGE_VALUE, NULL));
+        }
+        widget_set_runtime_value_key(widget, get_object_string_value(value, JT_RUNTIME_VALUE, NULL));
         json_printf("     location\n");
         SDL_Rect container = {  -1, -1, -10000, -10000 };
         deserialise_location(get_object_value(value, JT_LOCATION), ctx, &container, widget);
@@ -643,6 +705,7 @@ int deserialise_json(const char* json_string, const int len, view_context* ctx) 
             );
     printf("scaling factor = %f\n", scalef);
     deserialise_widgets(value, ctx);
+    json_value_free(value);
     return 0;
 }
 

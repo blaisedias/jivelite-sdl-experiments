@@ -1,6 +1,8 @@
+#include "application.h"
 #include "actions.h"
 #include "widgets.h"
 #include "logging.h"
+#include "lyrion_player.h"
 
 static SDL_Event quit_event = {.type = SDL_QUIT };
 static SDL_Event next_visu_event = {.type = USEREVENT_NEXT_VISU };
@@ -49,6 +51,7 @@ static void action_lock_vumeter(widget* wdgt) {
         }
         w = w->next;
     }
+    widget_multistate_button_set_state(wdgt, 1);
 }
 
 static void action_unlock_vumeter(widget* wdgt) {
@@ -59,6 +62,7 @@ static void action_unlock_vumeter(widget* wdgt) {
         }
         w = w->next;
     }
+    widget_multistate_button_set_state(wdgt, 0);
 }
 
 static void action_lock_visu(widget* wdgt) {
@@ -113,29 +117,41 @@ static void widget_dispatch_action_explicit(widget* wdgt, action act) {
             break;
 
         case ACTION_PLAY:
+            player_play(wdgt->view->app->player);
             break;
         case ACTION_PAUSE:
+            player_pause(wdgt->view->app->player);
             break;
         case ACTION_STOP:
+            player_stop(wdgt->view->app->player);
             break;
 
         case ACTION_NEXT_TRACK:
+            player_fwd(wdgt->view->app->player);
             break;
         case ACTION_PREV_TRACK:
+            player_rew(wdgt->view->app->player);
             break;
 
         case ACTION_REPEAT_ONCE:
+            player_repeat_one(wdgt->view->app->player);
             break;
         case ACTION_REPEAT:
+            player_repeat_toggle(wdgt->view->app->player);
             break;
         case ACTION_REPEAT_OFF:
+            player_repeat_off(wdgt->view->app->player);
             break;
 
         case ACTION_SHUFFLE:
+            player_shuffle_on(wdgt->view->app->player);
             break;
-        case ACTION_SHUFFE_ALBUM:
+        case ACTION_SHUFFLE_ALBUM:
+            player_shuffle_on(wdgt->view->app->player);
+            player_shuffle_toggle(wdgt->view->app->player);
             break;
         case ACTION_SHUFFLE_OFF:
+            player_shuffle_off(wdgt->view->app->player);
             break;
 
         case ACTION_MUSIC_INFORMATION:
@@ -146,6 +162,16 @@ static void widget_dispatch_action_explicit(widget* wdgt, action act) {
                 int level;
                 widget_slider_get_value(wdgt, &level);
                 action_printf("volume level = %d\n", level);
+                player_volume_set(wdgt->view->app->player, level);
+            }
+            break;
+
+        case ACTION_SEEK:
+            if (wdgt->type == WIDGET_SLIDER) {
+                int track_time;
+                widget_slider_get_value(wdgt, &track_time);
+                action_printf("seek = %d\n", track_time);
+                player_seek(wdgt->view->app->player, track_time);
             }
             break;
 
@@ -163,10 +189,13 @@ static void action_multi_state_button(widget* wdgt) {
             wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].action,
             action_to_string( wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].action));
     widget_dispatch_action_explicit(wdgt, wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].action);
-    wdgt->sub.multistate_button.state = (wdgt->sub.multistate_button.state + 1) % wdgt->sub.multistate_button.state_count;
+//    wdgt->sub.multistate_button.state = (wdgt->sub.multistate_button.state + 1) % wdgt->sub.multistate_button.state_count;
 }
 
 void widget_dispatch_action(widget* wdgt) {
+    if (wdgt->type == WIDGET_SLIDER && (!wdgt->sub.slider.defined_interactive || !wdgt->sub.slider.interactive)) {
+        return;
+    }
     switch(wdgt->action) {
         default:
             widget_dispatch_action_explicit(wdgt, wdgt->action);
@@ -210,6 +239,8 @@ static const char* action_strings[] = {
         "music-information",
 
         "set-volume-level",
+
+        "seek",
 
         "",                 /* END */
 };

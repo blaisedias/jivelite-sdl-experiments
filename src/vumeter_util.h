@@ -4,8 +4,8 @@
 ** This file is licensed under BSD. Please see the LICENSE file for details.
 */
 
-#ifndef _VUMETER_UTIL_H_
-#define _VUMETER_UTIL_H_
+#ifndef __jl_vumeter_util_h_
+#define __jl_vumeter_util_h_
 #include "logging.h"
 #include "vumeterdef.h"
 #include "types.h"
@@ -32,5 +32,5 @@ const vumeter_properties* VUMeter_get_props_list();
 void VUMeter_set_peak_hold(int peak_hold);
 void VUMeter_set_decay_hold(int decay_hold);
 
-#endif
+#endif  // __jl_vumeter_util_h_
 

@@ -4,10 +4,11 @@
 **
 ** This file is licensed under BSD. Please see the LICENSE file for details.
 **
+** derived from jivelite types.h
 */
 
-#ifndef JIVE_TYPES_H
-#define JIVE_TYPES_H
+#ifndef __jl_types_h_
+#define __jl_types_h_
 #include <SDL2/SDL_stdinc.h>
 
 /* boolean type */
@@ -36,4 +37,4 @@
 #define MAX(a,b) (((a)>=(b))?(a):(b))
 #define MIN(a,b) (((a)<=(b))?(a):(b))
 
-#endif // JIVE_TYPES_H
+#endif // __jl_types_h_

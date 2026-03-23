@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_render.h>
+#include "application.h"
 #include "widgets.h"
 #include "actions.h"
 #include "util.h"
@@ -9,6 +10,7 @@
 extern widget *vumeter_widget_destroy(widget *wdgt);
 extern void vumeter_widget_load_media(widget *wdgt, const char* resource_path);
 
+bool debug_rects = false;
 bool show_rects = false;
 bool show_input_rects = false;
 
@@ -24,6 +26,36 @@ static char* widget_type_strings[] = {
     "none"
 };
 
+static unsigned text_widget_id = 1;
+static void text_render_surface(widget* wdgt);
+
+static inline void free_ex(void** tgt) {
+    if (*tgt) {
+        free(*tgt);
+    }
+    *tgt = NULL;
+}
+
+#define FREE(x) free_ex((void **)(&x))
+#define DEBUG_RECT(w) if (debug_rects) { _debug_draw_rect(w); }
+
+bool widget_highlight(widget* wdgt) {
+    return  __atomic_load_n(&wdgt->atomic_highlight, __ATOMIC_ACQUIRE);
+}
+
+void widget_set_highlight(widget* wdgt, bool onoff) {
+     __atomic_store_n(&wdgt->atomic_highlight, onoff, __ATOMIC_RELEASE);
+}
+
+bool widget_pressed(widget* wdgt) {
+    return  __atomic_load_n(&wdgt->atomic_pressed, __ATOMIC_ACQUIRE);
+}
+
+void widget_set_pressed(widget* wdgt, bool onoff) {
+     __atomic_store_n(&wdgt->atomic_pressed, onoff, __ATOMIC_RELEASE);
+}
+
+
 const char* widget_type_name(widget_type typ) {
     if (typ >= WIDGET_NONE && typ <= WIDGET_END) {
         return widget_type_strings[typ];
@@ -34,12 +66,23 @@ const char* widget_type_name(widget_type typ) {
 void render_none(widget* btn) {
 }
 
+void _debug_draw_rect(widget* wdgt) {
+    if (wdgt) {
+        SDL_Rect draw_rect;
+        copyRect(&wdgt->rect, &draw_rect);
+        translate_draw_rect(&draw_rect);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 255, 0, 0, 128);
+        SDL_RenderDrawRect(wdgt->view->app->renderer, &draw_rect);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
+    }
+}
+
 void _show_draw_rect(widget* wdgt) {
     if (wdgt) {
         SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
-        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 64, 32);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 64, 128);
         SDL_RenderDrawRect(wdgt->view->app->renderer, &draw_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
@@ -50,33 +93,34 @@ void _show_input_rect(widget* wdgt) {
         SDL_Rect input_rect;
         copyRect(&wdgt->input_rect, &input_rect);
         translate_draw_rect(&input_rect);
-        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 0, 0, 32);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 0, 0, 128);
         SDL_RenderDrawRect(wdgt->view->app->renderer, &input_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
 }
 
 static void button_widget_render(widget* wdgt) {
-    if (wdgt->pressed && !wdgt->hotspot) {
+    DEBUG_RECT(wdgt);
+    if (widget_pressed(wdgt)&& !wdgt->hotspot) {
         SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
-        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 16);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 128);
         SDL_RenderFillRect(wdgt->view->app->renderer, &draw_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
-    if (wdgt->highlight && wdgt->hotspot == false && show_rects) {
+    if (widget_highlight(wdgt) && wdgt->hotspot == false && show_rects) {
         _show_draw_rect(wdgt);
     }
-    if (wdgt->highlight && show_input_rects) {
+    if (widget_highlight(wdgt) && show_input_rects) {
         _show_input_rect(wdgt);
     }
-    if (wdgt->hotspot == false || wdgt->highlight)  {
+    if (wdgt->hotspot == false || widget_highlight(wdgt))  {
         SDL_Rect image_rect;
         copyRect(&wdgt->rect, &image_rect);
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(wdgt->sub.button.texture_id),
+                tcache_quick_get_texture(wdgt->sub.button.texture_id, wdgt->view->app->renderer),
                 NULL,
                 &image_rect, wdgt->view->app->orientation, NULL, flip);
     }
@@ -137,7 +181,7 @@ widget* widget_load_media(widget* wdgt, const char* resource_path) {
                     wdgt->sub.image.texture_id = tcache_load_media(wdgt->image_path, wdgt->view->app->renderer, &loaded);
                     if (loaded) {
                         tcache_lock_texture(wdgt->sub.image.texture_id);
-                        if (0 == SDL_QueryTexture(tcache_quick_get_texture(wdgt->sub.image.texture_id), NULL, NULL, &wdgt->sub.image.w, &wdgt->sub.image.h)) {
+                        if (tcache_quick_get_texture_dimensions(wdgt->sub.image.texture_id, &wdgt->sub.image.w, &wdgt->sub.image.h)) {
                             setup_image_fit_src_rect(wdgt);
                         }
                     } else {
@@ -182,6 +226,18 @@ widget* widget_load_media(widget* wdgt, const char* resource_path) {
                                  error_printf("widget_load_media: slider failed to load %d %s\n", ix, wdgt->sub.slider.res[ix].image_paths[ix_img]);
                             }
                         }
+                    }
+                }
+                break;
+            case WIDGET_TEXT:
+                {
+                    _text_data_ptr txt_w = &wdgt->sub.text;
+                    txt_w->texture_id = tcache_create_entry(txt_w->name);
+                    if (txt_w->texture_id) {
+                        tcache_lock_texture(txt_w->texture_id);
+                        text_render_surface(wdgt);
+                    } else {
+                        error_printf("widget_load_media: text failed to create texture_id %s\n", txt_w->name);
                     }
                 }
                 break;
@@ -232,6 +288,46 @@ widget* widget_prev(widget *wdgt, widget* prev) {
     return wdgt;
 }
 */
+
+widget* widget_set_player_value_key(widget* wdgt, const char* key) {
+    if (wdgt) {
+        if (wdgt->player_value_key != NULL) {
+            free((void *)wdgt->player_value_key);
+            wdgt->player_value_key = NULL;
+        }
+        if (key) {
+            wdgt->player_value_key = strdup(key);
+        }
+    }
+    return wdgt;
+}
+
+widget* widget_set_player_range_value_key(widget* wdgt, const char* key) {
+    if (wdgt) {
+        if (wdgt->player_range_value_key != NULL) {
+            free((void *)wdgt->player_range_value_key);
+            wdgt->player_range_value_key = NULL;
+        }
+        if (key) {
+            wdgt->player_range_value_key = strdup(key);
+        }
+    }
+    return wdgt;
+}
+
+widget* widget_set_runtime_value_key(widget* wdgt, const char* key) {
+    if (wdgt) {
+        if (wdgt->runtime_value_key != NULL) {
+            free((void *)wdgt->runtime_value_key);
+            wdgt->runtime_value_key = NULL;
+        }
+        if (key) {
+            wdgt->runtime_value_key = strdup(key);
+        }
+    }
+    return wdgt;
+}
+
 
 widget* widget_action(widget* wdgt, action action) {
     if (wdgt) {
@@ -325,6 +421,28 @@ widget* widget_destroy(widget* wdgt) {
                     }
                 }
                 break;
+            case WIDGET_TEXT:
+                {
+                    _text_data_ptr txt_w = &wdgt->sub.text;
+                    tcache_unlock_texture(txt_w->texture_id);
+                    FREE(txt_w->name);
+                    FREE(txt_w->content);
+                    FREE(txt_w->format);
+                    if (txt_w->font) {
+                        TTF_CloseFont(txt_w->font);
+                        txt_w->font = NULL;
+                    }
+                }
+                break;
+        }
+        if (wdgt->player_value_key) {
+            free((void *)wdgt->player_value_key);
+        }
+        if (wdgt->runtime_value_key) {
+            free((void *)wdgt->runtime_value_key);
+        }
+        if (wdgt->player_range_value_key) {
+            free((void *)wdgt->player_range_value_key);
         }
         if (wdgt->image_path != NULL) {
             free((void *)wdgt->image_path);
@@ -346,7 +464,8 @@ widget* widget_create_button(const view_context* view) {
 }
 
 static void image_widget_render(widget* wdgt) {
-    if (wdgt->highlight) {
+    DEBUG_RECT(wdgt);
+    if (widget_highlight(wdgt)) {
         if (show_rects) { _show_draw_rect(wdgt); }
         if (show_input_rects) { _show_input_rect(wdgt); }
     }
@@ -357,20 +476,20 @@ static void image_widget_render(widget* wdgt) {
     switch(wdgt->sub.image.scale_op) {
         case IMAGE_STRETCH_FILL:
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                   tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                   tcache_quick_get_texture(wdgt->sub.image.texture_id, wdgt->view->app->renderer),
                    NULL, &image_rect,
                    wdgt->view->app->orientation,
                    NULL, flip);
             break;
         case IMAGE_FIT:
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                   tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                   tcache_quick_get_texture(wdgt->sub.image.texture_id, wdgt->view->app->renderer),
                    NULL, &wdgt->sub.image.dst_rect,
                    wdgt->view->app->orientation, NULL, flip);
             break;
         case IMAGE_CENTRED_FILL:
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                    tcache_quick_get_texture(wdgt->sub.image.texture_id),
+                    tcache_quick_get_texture(wdgt->sub.image.texture_id, wdgt->view->app->renderer),
                     &wdgt->sub.image.src_rect, &image_rect,
                     wdgt->view->app->orientation,
                     NULL, flip);
@@ -438,26 +557,27 @@ widget* widget_hotspot_edge(widget* wdgt, hotspot_edge edge, SDL_Rect *r) {
 }
 
 static void multistate_button_widget_render(widget* wdgt) {
-    if (wdgt->pressed && !wdgt->hotspot) {
+    DEBUG_RECT(wdgt);
+    if (widget_pressed(wdgt) && !wdgt->hotspot) {
     SDL_Rect draw_rect;
         copyRect(&wdgt->rect, &draw_rect);
         translate_draw_rect(&draw_rect);
-        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 16);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 128);
         SDL_RenderFillRect(wdgt->view->app->renderer, &draw_rect);
         SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
     }
-    if (wdgt->highlight && wdgt->hotspot == false && show_rects) {
+    if (widget_highlight(wdgt) && wdgt->hotspot == false && show_rects) {
         _show_draw_rect(wdgt);
     }
-    if (wdgt->highlight && show_input_rects) {
+    if (widget_highlight(wdgt) && show_input_rects) {
         _show_input_rect(wdgt);
     }
-    if (wdgt->hotspot == false || wdgt->highlight)  {
+    if (wdgt->hotspot == false || widget_highlight(wdgt))  {
         SDL_Rect image_rect;
         copyRect(&wdgt->rect, &image_rect);
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-            tcache_quick_get_texture(wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].texture_id),
+            tcache_quick_get_texture(wdgt->sub.multistate_button.res[wdgt->sub.multistate_button.state].texture_id, wdgt->view->app->renderer),
             NULL, &image_rect,
             wdgt->view->app->orientation, NULL, flip);
     }
@@ -503,10 +623,8 @@ widget* widget_multistate_button_addstate(widget* wdgt, unsigned statenum, const
 }
 
 widget* widget_multistate_button_set_state(widget* wdgt, unsigned statenum) {
-    if (wdgt->type == WIDGET_MULTISTATE_BUTTON && statenum) {
-        if (wdgt->sub.multistate_button.state_count > statenum) {
-            wdgt->sub.multistate_button.state = statenum;
-        }
+    if (wdgt->type == WIDGET_MULTISTATE_BUTTON && statenum < wdgt->sub.multistate_button.state_count) {
+        wdgt->sub.multistate_button.state = statenum;
     }
     return wdgt;
 }
@@ -590,7 +708,8 @@ static _slider_workspace* slider_widget_init_workspace(widget* wdgt) {
 }
 
 static void slider_widget_render(widget* wdgt) {
-    if (wdgt->highlight) {
+    DEBUG_RECT(wdgt);
+    if (widget_highlight(wdgt)) {
         if (show_rects) { _show_draw_rect(wdgt); }
         if (show_input_rects) { _show_input_rect(wdgt); }
     }
@@ -604,13 +723,21 @@ static void slider_widget_render(widget* wdgt) {
 
     SDL_Rect pick_rect;
     copyRect(&wdgt->rect, &pick_rect);
+    if (wk->value_range_delta < 1) {
+        return;
+    }
+    pick_rect.w = pick->w;
     if (wk->value_range_delta > 0) {
-        if (wdgt->pressed) {
-            pick_rect.x = wk->drag_pos - wk->half_pw;
+        if (wdgt->sub.slider.defined_interactive && wdgt->sub.slider.interactive) {
+            if (widget_pressed(wdgt)) {
+                pick_rect.x = wk->drag_pos - wk->half_pw;
+            } else {
+                pick_rect.x = wk->current_pos - wk->half_pw;
+            }
         } else {
             pick_rect.x = wk->current_pos - wk->half_pw;
+            pick_rect.w = 0;
         }
-        pick_rect.w = pick->w;
     }
 
     {
@@ -618,7 +745,7 @@ static void slider_widget_render(widget* wdgt) {
         if (bar_start) {
             int ix_texture = wk->current_pos > wk->min_pos? 1: 0;
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                   tcache_quick_get_texture(bar_start->texture_ids[ix_texture]),
+                   tcache_quick_get_texture(bar_start->texture_ids[ix_texture], wdgt->view->app->renderer),
                    NULL, &wk->bar_start_rect,
                    wdgt->view->app->orientation, NULL, flip);
         }
@@ -629,7 +756,7 @@ static void slider_widget_render(widget* wdgt) {
         if (bar_end) {
             int ix_texture = wk->current_pos < wk->max_pos? 0: 1;
             SDL_RenderCopyEx(wdgt->view->app->renderer,
-                   tcache_quick_get_texture(bar_end->texture_ids[ix_texture]),
+                   tcache_quick_get_texture(bar_end->texture_ids[ix_texture], wdgt->view->app->renderer),
                    NULL, &wk->bar_end_rect,
                    wdgt->view->app->orientation, NULL, flip);
         }
@@ -642,17 +769,17 @@ static void slider_widget_render(widget* wdgt) {
         image_rect.w = pick_rect.x - image_rect.x;
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(bar->texture_ids[0]),
+                tcache_quick_get_texture(bar->texture_ids[0], wdgt->view->app->renderer),
                 NULL, &image_rect,
                 wdgt->view->app->orientation, NULL, flip);
     }
 
-    {
+    if (pick_rect.w && pick_rect.h && wdgt->sub.slider.defined_interactive && wdgt->sub.slider.interactive) {
         SDL_Rect image_rect;
-        copyRect( &pick_rect, &image_rect);
+        copyRect(&pick_rect, &image_rect);
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(pick->texture_ids[0]),
+                tcache_quick_get_texture(pick->texture_ids[0], wdgt->view->app->renderer),
                 NULL, &image_rect,
                 wdgt->view->app->orientation, NULL, flip);
     }
@@ -664,7 +791,7 @@ static void slider_widget_render(widget* wdgt) {
         image_rect.x = pick_rect.x + pick_rect.w;
         translate_image_rect(&image_rect);
         SDL_RenderCopyEx(wdgt->view->app->renderer,
-                tcache_quick_get_texture(bar->texture_ids[1]),
+                tcache_quick_get_texture(bar->texture_ids[1], wdgt->view->app->renderer),
                 NULL, &image_rect,
                 wdgt->view->app->orientation, NULL, flip);
     }
@@ -677,6 +804,8 @@ widget *widget_create_slider(const view_context* view) {
         *((widget_type*)&wdgt->type) = WIDGET_SLIDER;
         wdgt->action = ACTION_NONE;
         wdgt->render = slider_widget_render;
+        wdgt->sub.slider.interactive = true;
+        wdgt->sub.slider.defined_interactive = true;
     }
     return wdgt;
 }
@@ -755,16 +884,18 @@ widget *widget_slider_image_height(widget* wdgt, slider_resource_ID id, int heig
 }
 
 static widget *widget_slider_track(widget* wdgt, const SDL_Point *pt) {
-    if (wdgt->pressed && (wdgt->sub.slider.range.end - wdgt->sub.slider.range.start) > 0) {
-        _slider_resource* pick = wdgt->sub.slider.res+SLIDER_PICK;
-        _slider_workspace* wk = &wdgt->sub.slider.wk;
-        if (pick) {
-            if (pt->x < wk->min_pos) {
-                wk->drag_pos = wk->min_pos;
-            } else if (pt->x > wk->max_pos) {
-                wk->drag_pos = wk->max_pos;
-            } else {
-                wk->drag_pos = pt->x;
+    if (wdgt->sub.slider.defined_interactive && wdgt->sub.slider.interactive) {
+        if (widget_pressed(wdgt) && (wdgt->sub.slider.range.end - wdgt->sub.slider.range.start) > 0) {
+            _slider_resource* pick = wdgt->sub.slider.res+SLIDER_PICK;
+            _slider_workspace* wk = &wdgt->sub.slider.wk;
+            if (pick) {
+                if (pt->x < wk->min_pos) {
+                    wk->drag_pos = wk->min_pos;
+                } else if (pt->x > wk->max_pos) {
+                    wk->drag_pos = wk->max_pos;
+                } else {
+                    wk->drag_pos = pt->x;
+                }
             }
         }
     }
@@ -772,9 +903,11 @@ static widget *widget_slider_track(widget* wdgt, const SDL_Point *pt) {
 }
 
 static widget *widget_slider_tracking_commit(widget* wdgt, const SDL_Point *pt) {
-    widget_slider_track(wdgt, pt);
-    _slider_workspace* wk = &wdgt->sub.slider.wk;
-    wk->current_pos = wk->drag_pos;
+    if (wdgt->sub.slider.defined_interactive && wdgt->sub.slider.interactive) {
+        widget_slider_track(wdgt, pt);
+        _slider_workspace* wk = &wdgt->sub.slider.wk;
+        wk->current_pos = wk->drag_pos;
+    }
     return wdgt;
 }
 
@@ -785,7 +918,8 @@ widget *widget_slider_set_value(widget* wdgt, int value) {
             _slider_workspace* wk = slider_widget_init_workspace(wdgt);
             if (wk->value_range_delta) {
                 // range must be non-zero to calculate the position of the pick
-                wk->current_pos = ((value - wdgt->sub.slider.range.start)*(wk->max_pos - wk->min_pos))/wk->value_range_delta;
+                float offset = ((float)(value - wdgt->sub.slider.range.start)*(wk->max_pos - wk->min_pos))/wk->value_range_delta;
+                wk->current_pos = wk->min_pos + (int)offset;
                 dummy_printf("widget_slider_set_value (%d * %d)/%d = %d, for %d\n", 
                         value - wdgt->sub.slider.range.start,
                         (wk->max_pos - wk->min_pos),
@@ -815,6 +949,22 @@ widget *widget_slider_range(widget* wdgt, int start, int end) {
     return wdgt;
 }
 
+widget *widget_slider_set_interactive(widget* wdgt, bool yn) {
+    if (wdgt && wdgt->type == WIDGET_SLIDER) {
+        if (wdgt->sub.slider.interactive != yn) {
+            wdgt->sub.slider.interactive = yn;
+        }
+    }
+    return wdgt;
+}
+
+widget *widget_slider_define_interactive(widget* wdgt, bool yn) {
+    if (wdgt && wdgt->type == WIDGET_SLIDER) {
+        wdgt->sub.slider.defined_interactive = yn;
+    }
+    return wdgt;
+}
+
 
 widget *widget_slider_get_value(widget* wdgt, int* value) {
     if (wdgt && wdgt->type == WIDGET_SLIDER) {
@@ -828,6 +978,169 @@ widget *widget_slider_get_value(widget* wdgt, int* value) {
     return wdgt;
 }
 
+static void text_widget_render(widget* wdgt) {
+    DEBUG_RECT(wdgt);
+    _text_data_ptr txt_w = &wdgt->sub.text;
+    if (widget_pressed(wdgt)&& !wdgt->hotspot) {
+        SDL_Rect draw_rect;
+        copyRect(&wdgt->rect, &draw_rect);
+        translate_draw_rect(&draw_rect);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 128, 128, 128, 128);
+        SDL_RenderFillRect(wdgt->view->app->renderer, &draw_rect);
+        SDL_SetRenderDrawColor(wdgt->view->app->renderer, 0, 0, 0, 0);
+    }
+    if (widget_highlight(wdgt) && wdgt->hotspot == false && show_rects) {
+        _show_draw_rect(wdgt);
+    }
+    if (widget_highlight(wdgt) && show_input_rects) {
+        _show_input_rect(wdgt);
+    }
+    if (wdgt->hotspot == false || widget_highlight(wdgt))  {
+        SDL_Rect image_rect;
+        copyRect(&txt_w->dst_rect, &image_rect);
+        translate_image_rect(&image_rect);
+        SDL_RenderCopyEx(wdgt->view->app->renderer,
+                tcache_quick_get_texture(txt_w->texture_id, wdgt->view->app->renderer),
+                NULL,
+                &image_rect, wdgt->view->app->orientation, NULL, flip);
+    }
+}
+
+widget* widget_create_text(const view_context* view) {
+    widget* wdgt = widget_create(view);
+    if (wdgt) {
+        static SDL_Color white = {255, 255, 255, 255};
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        *((widget_type*)&wdgt->type) = WIDGET_TEXT;
+        wdgt->action = ACTION_NONE;
+        wdgt->render = text_widget_render;
+        char buffer[64];
+        sprintf(buffer, "\\-text-%x-\\", __atomic_fetch_add(&text_widget_id, 1, __ATOMIC_ACQ_REL));
+        txt_w->name = strdup(buffer);
+        txt_w->content = strdup("");
+        txt_w->colour = white;
+    }
+    return wdgt;
+}
+
+widget* widget_text_set_format(widget* wdgt, const char* format) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        if (txt_w->format) {
+            free((void *)txt_w->format);
+            txt_w->format = NULL;
+        }
+        if (format) {
+            txt_w->format = strdup(format);
+        }
+    }
+    return wdgt;
+}
+
+static void text_render_surface(widget* wdgt) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        txt_w->content_dim.x = txt_w->content_dim.y = txt_w->content_dim.w = txt_w->content_dim.h = 0;
+        if (txt_w->texture_id) {
+            SDL_Surface *surface = TTF_RenderUTF8_Blended(txt_w->font, txt_w->content, txt_w->colour);
+            if (surface) {
+                if (surface->w > wdgt->view->app->max_texture_width) {
+                    // FIXME: 
+                    // width exceeds the texture width supported by the renderer
+                    // for now scale down the surface to match that limit
+                    float scalef = (float)wdgt->view->app->max_texture_width/surface->w;
+                    SDL_Surface *scaled_surface = SDL_CreateRGBSurfaceWithFormat(0,
+                            surface->w*scalef, surface->h*scalef,
+                            SDL_BITSPERPIXEL(wdgt->view->app->pixelFormat), wdgt->view->app->pixelFormat);
+                    if (scaled_surface) {
+                        SDL_BlitScaled(surface, NULL, scaled_surface, NULL);
+                        SDL_free(surface);
+                        error_printf("text_render_surface: renderer limit: is %d scaling down by %f from %dx%d to %dx%d\n%s\n",
+                                wdgt->view->app->max_texture_width,
+                                scalef,
+                                surface->w, surface->h,
+                                scaled_surface->w, scaled_surface->h,
+                                txt_w->content
+                                );
+                        surface = scaled_surface;
+                    }
+                }
+                tcache_set_surface(txt_w->texture_id, surface);
+                txt_w->content_dim.w = surface->w;
+                txt_w->content_dim.h = surface->h;
+                txt_w->dst_rect.x = wdgt->rect.x + ((wdgt->rect.w - surface->w)/2);
+                txt_w->dst_rect.y = wdgt->rect.y + ((wdgt->rect.h - surface->h)/2);
+                txt_w->dst_rect.w = surface->w;
+                txt_w->dst_rect.h = surface->h;
+                
+                // for now scale text to fit content.
+                float scale_x = (float)surface->w/wdgt->rect.w;
+                float scale_y = (float)surface->h/wdgt->rect.h;
+                if (scale_x > 1 || scale_y > 1) {
+                    float scale = scale_x > scale_y ? scale_x : scale_y;
+                    int scaled_w = surface->w / scale;
+                    int scaled_h = surface->h / scale;
+                    error_printf("text_render_surface: scaling text to fit %f (x=%f,y=%f) from %dx%d to %dx%d\n%s\n",
+                            1/scale, 1/scale_x, 1/scale_y,
+                            surface->w, surface->h,
+                            scaled_w, scaled_h,
+                            txt_w->content
+                            );
+                    txt_w->dst_rect.x = wdgt->rect.x + ((wdgt->rect.w - scaled_w)/2);
+                    txt_w->dst_rect.y = wdgt->rect.y + ((wdgt->rect.h - scaled_h)/2);
+                    txt_w->dst_rect.w = scaled_w;
+                    txt_w->dst_rect.h = scaled_h;
+                }
+            }
+        }
+    }
+}
+
+widget* widget_text_set_content(widget* wdgt, const char* content) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        if (NULL == content || 0 == strlen(content)) {
+            // empty strings => TTF_Render returns a nil surface,
+            // force change of texture
+            content = " ";
+        }
+        if (txt_w->content) {
+            if (0 == strcmp(content, txt_w->content)) {
+                return wdgt;
+            }
+            free((void *)txt_w->content);
+            txt_w->content = NULL;
+            txt_w->content_dim.w = txt_w->content_dim.h = 0;
+        }
+        txt_w->content = strdup(content);
+        text_render_surface(wdgt);
+    }
+    return wdgt;
+}
+
+widget* widget_text_set_font(widget* wdgt, const char* font_path, int size) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        txt_w->font = TTF_OpenFont(font_path, size);
+        if (!txt_w->font) {
+            error_printf("failed to create font %s %d %s\n", font_path, size, TTF_GetError());
+        }
+        text_render_surface(wdgt);
+    }
+    return wdgt;
+}
+
+widget* widget_text_set_colour(widget* wdgt, SDL_Color colour) {
+    if (wdgt && wdgt->type == WIDGET_TEXT) {
+        _text_data_ptr txt_w = &wdgt->sub.text;
+        txt_w->colour.r = colour.r;
+        txt_w->colour.g = colour.g;
+        txt_w->colour.b = colour.b;
+        txt_w->colour.a = colour.a;
+    }
+    text_render_surface(wdgt);
+    return wdgt;
+}
 
 static widget_list* widget_list_initialise(widget_list* list, view_context* view) {
     if (list) {
@@ -893,23 +1206,23 @@ void widget_list_react(const widget_list* list, const pointer_input input, SDL_P
                 if (widget->hidden) { continue;}
                 if (!selected) {
                     widget->focussed = SDL_PointInRect(pt, &widget->input_rect) && (!widget->focus_disabled);
-                    widget->highlight = widget->focussed;
-                    widget->pressed = widget->focussed;
+                    widget_set_highlight(widget, widget->focussed);
+                    widget_set_pressed(widget, widget->focussed);
                     selected = widget->focussed;
                     if (widget->type == WIDGET_SLIDER) {
                         widget_slider_track(widget, pt);
                     }
                 } else {
                     widget->focussed = false;
-                    widget->highlight = false;
-                    widget->pressed = false;
+                    widget_set_highlight(widget, false);
+                    widget_set_pressed(widget, false);
                 }
             }
             break;
         case POINTER_UP:
             for(widget* widget=list->tail.prev; widget != NULL; widget=widget->prev) {
                 if (widget->hidden) { continue;}
-                widget->pressed = false;
+                widget_set_pressed(widget, false);
                 if (SDL_PointInRect(pt, &widget->input_rect) && widget->focussed) {
                    input_printf("HIT: {%04d,%04d} {%04d,%04d} %p\n",
                                 widget->input_rect.x, widget->input_rect.y,
@@ -918,7 +1231,7 @@ void widget_list_react(const widget_list* list, const pointer_input input, SDL_P
                                 widget
                                 );
                     widget->focussed = false;
-                    widget->highlight = widget->focussed;
+                    widget_set_highlight(widget, widget->focussed);
                     if (widget->type == WIDGET_SLIDER) {
                         widget_slider_tracking_commit(widget, pt);
                         int value =  -987654321;
@@ -928,7 +1241,7 @@ void widget_list_react(const widget_list* list, const pointer_input input, SDL_P
                     widget_dispatch_action(widget);
                 } else {
                     widget->focussed = false;
-                    widget->highlight = false;
+                    widget_set_highlight(widget, false);
                 }
             }
             break;
@@ -936,15 +1249,15 @@ void widget_list_react(const widget_list* list, const pointer_input input, SDL_P
             for (widget* widget=list->tail.prev; widget != NULL; widget=widget->prev) {
                 if (widget->hidden) { continue;}
                 if (!selected) {
-                    widget->highlight = SDL_PointInRect(pt, &widget->input_rect) && (!widget->focus_disabled);
-                    selected = widget->highlight;
+                    widget_set_highlight(widget, SDL_PointInRect(pt, &widget->input_rect) && (!widget->focus_disabled));
+                    selected = widget_highlight(widget);
                     if (selected) {
                         if (widget->type == WIDGET_SLIDER) {
                             widget_slider_track(widget, pt);
                         }
                     }
                 } else {
-                    widget->highlight = false;
+                    widget_set_highlight(widget, false);
                 }
             }
             break;

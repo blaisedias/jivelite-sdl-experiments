@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+tce-load -il git.tcz
 tce-load -il sdl2.tcz
 tce-load -il sdl2-dev.tcz
 tce-load -il sdl2_image.tcz

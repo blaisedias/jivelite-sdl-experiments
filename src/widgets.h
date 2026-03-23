@@ -1,6 +1,8 @@
-#ifndef __CONTROL_H_
-#define __CONTROL_H_
+#ifndef __jl_widgets_h_
+#define __jl_widgets_h_
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
+
 #include "util.h"
 #include "actions.h"
 #include "types.h"
@@ -15,6 +17,7 @@ typedef enum {
     WIDGET_MULTISTATE_BUTTON,
     WIDGET_VUMETER,
     WIDGET_SLIDER,
+    WIDGET_TEXT,
     WIDGET_END
 }widget_type;
   
@@ -90,6 +93,17 @@ typedef struct {
     SDL_Rect bar_empty_rect;
 }_slider_workspace;
 
+typedef struct {
+    texture_id_t texture_id;
+    TTF_Font* font;
+    const char* name;   // name is used for texture cache
+    const char* format; // player format string, can be NULL
+    const char* content;
+    SDL_Rect content_dim;
+    SDL_Color colour;
+    SDL_Rect dst_rect;
+}_text_data,*_text_data_ptr;
+
 struct widget {
     struct      widget *next;
     struct      widget *prev;
@@ -100,7 +114,8 @@ struct widget {
     action         action;
     void        (*render)(struct widget*);
     bool        focussed;
-    bool        highlight;
+    // 
+    bool        atomic_highlight;
     bool        hidden;
     bool        hotspot;
     const bool  focus_disabled;
@@ -118,7 +133,10 @@ struct widget {
     // 2 - for unrotated operations like DrawRect, FillRect
     //SDL_Rect    draw_rect;
 
-    bool         pressed;
+    bool         atomic_pressed;
+    const char*  player_value_key;
+    const char*  player_range_value_key;
+    const char*  runtime_value_key;
 
     union {
         vumeter_widget* vu;
@@ -140,6 +158,9 @@ struct widget {
             _btn_resource* res;
         }multistate_button;
         struct {
+            // interactive property as defined
+            bool defined_interactive;
+            // interactive property runtime controlled
             bool interactive;
             struct {
                 int start;
@@ -148,9 +169,17 @@ struct widget {
             _slider_resource res[SLIDER_RESOURCE_COUNT];
             _slider_workspace wk;
         }slider;
+        _text_data text;
     }sub;
 };
 
+bool widget_highlight(widget* wdgt); 
+void widget_set_highlight(widget* wdgt, bool onoff);
+bool widget_pressed(widget* wdgt);
+void widget_set_pressed(widget* wdgt, bool onoff);
+
+
+extern bool debug_rects;
 extern bool show_rects;
 extern bool show_input_rects;
 
@@ -159,6 +188,10 @@ void render_none(widget* wdgt);
 const char* widget_type_name(widget_type typ);
 widget* widget_rect(widget *wdgt, const SDL_Rect *rect);
 widget* widget_bounds(widget *wdgt, int x, int y, int w, int h);
+widget* widget_set_player_value_key(widget* wdgt, const char* key);
+widget* widget_set_runtime_value_key(widget* wdgt, const char* key);
+// TODO: fix implicit range start value of 0
+widget* widget_set_player_range_value_key(widget* wdgt, const char* key);
 
 /*
 widget* widget_next(widget *wdgt, widget* next);
@@ -191,10 +224,18 @@ widget *widget_vumeter_select_lock(widget *wdgt, bool lock);
 widget *widget_create_slider(const view_context*);
 widget *widget_slider_range(widget* , int start, int end);
 widget *widget_slider_set_value(widget* wdgt, int value);
+widget *widget_slider_set_interactive(widget* wdgt, bool yn);
+widget *widget_slider_define_interactive(widget* wdgt, bool yn);
 widget *widget_slider_get_value(widget* wdgt, int* value);
 widget *widget_slider_image_paths(widget* , slider_resource_ID id, const char* path1, const char* path2);
 widget *widget_slider_image_width(widget* , slider_resource_ID id, int width);
 widget *widget_slider_image_height(widget* , slider_resource_ID id, int height);
+
+widget* widget_create_text(const view_context*);
+widget* widget_text_set_format(widget*, const char* format);
+widget* widget_text_set_content(widget*, const char* content);
+widget* widget_text_set_font(widget*, const char* font_path, int size);
+widget* widget_text_set_colour(widget*, SDL_Color colour);
 
 struct widget_list {
     widget head;
@@ -202,7 +243,7 @@ struct widget_list {
 };
 
 struct view_context {
-    const app_context* app;
+    const struct app_context* app;
     widget_list*       list;
 };
 
@@ -213,4 +254,4 @@ widget_list* destroy_widgets_in_list(widget_list*);
 void widget_dispatch_action(widget* wdgt);
 void widget_list_load_media(const widget_list* list, const char* resource_path);
 void widget_list_react(const widget_list* list, const pointer_input input, SDL_Point* pt);
-#endif
+#endif // __jl_widgets_h_

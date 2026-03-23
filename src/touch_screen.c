@@ -29,6 +29,7 @@
 #include <getopt.h>
 #include <errno.h>
 #include <unistd.h>
+#include "timing.h"
 
 #include "touch_screen.h"
 
@@ -142,6 +143,9 @@ int touch_screen_service(touch_screen_svc_config* config)
             ret = ts_read_mt(ts, samp_mt, max_slots, read_samples);
 
         if (ret < 0) {
+            if (config != NULL) {
+                sleep_milli_seconds(config->sleeptime);
+            }
             continue;
         }
 

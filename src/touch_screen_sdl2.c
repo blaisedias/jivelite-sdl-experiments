@@ -48,6 +48,7 @@ int start_touch_screen_event_generator(touch_screen_svc_config* config) {
         return EXIT_FAILURE;
     }
     if (tseg_thrd == NULL) {
+        cfg.sleeptime = 100;
         cfg.up = postUp;
         cfg.down = postDown;
         cfg.motion = postMotion;
