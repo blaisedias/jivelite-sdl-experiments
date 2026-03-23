@@ -12,6 +12,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <poll.h>
+#include <errno.h>
 
 #include "timing.h"
 #include "logging.h"
@@ -307,7 +308,6 @@ typedef struct {
     char buffer[4096];
     int  sockfd;
     FILE *fp;
-    bool lock;
 }lms_io, *lms_io_ptr;
 
 struct lyrion_player {
@@ -319,23 +319,10 @@ struct lyrion_player {
     const char* lms;
     local_addr_ptr lp;
     const char* lms_player_id;
-    lms_io io;
-    lms_io cmd_io;
     player_status status;
     int volume;
+    int64_t connection_failed_ts;
 };
-
-static int reopen_player(player_ptr player);
-
-static void lock_io(lms_io_ptr iop) {
-    while(__atomic_test_and_set(&iop->lock, __ATOMIC_ACQ_REL)) {
-        sleep_milli_seconds(1);
-    }
-}
-
-static void unlock_io(lms_io_ptr iop) {
-    __atomic_clear(&iop->lock, __ATOMIC_RELEASE);
-}
 
 static inline void free_ex(void** tgt) {
     if (*tgt) {
@@ -381,7 +368,7 @@ static void get_local_addrs(player_ptr player) {
                         NULL, 0, NI_NUMERICHOST);
             if (s != 0) {
                 error_printf("getnameinfo() failed: %s\n", gai_strerror(s));
-                exit(EXIT_FAILURE);
+                return;
             }
 
             local_addr_ptr lp = calloc(1, sizeof(*lp) + strlen(host) + 4);
@@ -463,11 +450,10 @@ static int escaped_strlen(const char* str) {
     return len;
 }
 
-static int __lms_req(player_ptr player, const char* prefix, const char* suffix, lms_io_ptr io_ptr, const char *format, va_list args, char** data_ptr) {
+static int __lms_req(player_ptr player, const char* prefix, const char* suffix, const char *format, va_list args, char** data_ptr, lms_io_ptr io_ptr) {
     // if send fails return value is -1, 
     int rv = -2;
-    *data_ptr = "";
-    lock_io(io_ptr);
+    *data_ptr = NULL;
     ZERO(io_ptr->cmd_buff);
     ZERO(io_ptr->buffer);
     char *p = io_ptr->cmd_buff;
@@ -504,21 +490,54 @@ static int __lms_req(player_ptr player, const char* prefix, const char* suffix, 
     } else {
         fprintf(stderr, "cmd buff is too small!\n%s\n", io_ptr->cmd_buff);
     }
-    unlock_io(io_ptr);
     return rv;
 }
 
-static char* lms_req(player_ptr player, const char* prefix, const char* suffix, lms_io_ptr io_ptr, const char *format, va_list args) {
-    char* data = NULL;
-    int sent = __lms_req(player, prefix, suffix, io_ptr, format, args, &data);
-    // -2 => command buffer is too small, and we do not expect to send 0 bytes!
-    if (sent > -2 && sent <= 0) {
-        error_printf("send failed, closing and opening player again and retrying\n");
-        reopen_player(player);
-        if (0 >= __lms_req(player, prefix, suffix, io_ptr, format, args, &data)) {
-            error_printf("request failed - after reopening player\n");
-            return NULL;
+static int _lms_req(player_ptr player, const char* prefix, const char* suffix, const char *format, va_list args, char** data_ptr) {
+    lms_io io;
+    *data_ptr = NULL;
+    int rv = -6;
+
+    if ((io.sockfd = socket(AF_INET, SOCK_STREAM, 0)) > 0) {
+        int status =  connect(io.sockfd, &player->server.sock_addr, sizeof(player->server.sock_addr));
+        if (status == 0) {
+            // connection succeeded, clear failure timestamp
+            player->connection_failed_ts = 0;
+            io.fp = fdopen(io.sockfd, "r");
+            if (io.fp) {
+                rv = __lms_req(player, prefix, suffix, format, args, data_ptr, &io);
+                fclose(io.fp);
+            } else {
+                error_printf("Failed to create input stream %s\n", strerror(errno));
+                rv =  -5;
+            }
+        } else {
+            // do not report repeated connection failure
+            if (!player->connection_failed_ts) {
+                error_printf("Connection failed %d\n", status);
+                player->connection_failed_ts = get_milli_seconds();
+            }
+            rv = -4;
         }
+        close(io.sockfd);
+    } else {
+        error_printf("Socket creation error\n");
+        rv = -3;
+    }
+    return rv;
+}
+
+
+static char* lms_req(player_ptr player, const char* prefix, const char* suffix, const char *format, va_list args) {
+    char* data = NULL;
+    if (player->server.sin_addr.sin_addr.s_addr != 0) {
+        int sent = _lms_req(player, prefix, suffix, format, args, &data);
+        // for now return value is not used
+        dummy_printf("sent = %d\n", sent);
+    }
+    if (!data) {
+        //return a pointer to empty string
+        data = calloc(1,1);
     }
     return data;
 }
@@ -526,7 +545,7 @@ static char* lms_req(player_ptr player, const char* prefix, const char* suffix, 
 static char* lms_query(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = lms_req(player, NULL, " ?\n", &player->io, format, args);
+    char* rv = lms_req(player, NULL, " ?\n", format, args);
     va_end(args);
     return rv;
 }
@@ -534,7 +553,7 @@ static char* lms_query(player_ptr player, const char *format, ...) {
 static char* lms_query_player(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = lms_req(player, player->lms_player_id, " ?\n", &player->io, format, args);
+    char* rv = lms_req(player, player->lms_player_id, " ?\n", format, args);
     va_end(args);
     return rv;
 }
@@ -542,7 +561,7 @@ static char* lms_query_player(player_ptr player, const char *format, ...) {
 static char* lms_compound_query_player(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = lms_req(player, player->lms_player_id, "\n", &player->io, format, args);
+    char* rv = lms_req(player, player->lms_player_id, "\n", format, args);
     va_end(args);
     return rv;
 }
@@ -550,7 +569,7 @@ static char* lms_compound_query_player(player_ptr player, const char *format, ..
 static void lms_command(player_ptr player, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    char* rv = lms_req(player, player->lms_player_id, "\n", &player->cmd_io, format, args);
+    char* rv = lms_req(player, player->lms_player_id, "\n", format, args);
     va_end(args);
     FREE(rv);
 }
@@ -843,22 +862,6 @@ static bool get_player_status(player_ptr player) {
 }
 
 static void __close_player(player_ptr player) {
-    if (player->io.fp) {
-        fclose(player->io.fp);
-        player->io.fp = NULL;
-    }
-    if (player->io.sockfd >= 0) {
-        close(player->io.sockfd);
-        player->io.sockfd = -1;
-    }
-    if (player->cmd_io.fp) {
-        fclose(player->cmd_io.fp);
-        player->cmd_io.fp = NULL;
-    }
-    if (player->cmd_io.sockfd >= 0) {
-        close(player->cmd_io.sockfd);
-        player->cmd_io.sockfd = -1;
-    }
     local_addr_ptr lp = player->lp;
     while(lp) {
         player->lp = player->lp->next;
@@ -896,7 +899,7 @@ static in_addr_t discover_server_ip(int retry, int timeout) {
     for(int count = 0; s.sin_addr.s_addr == 0 && count < retry; ++count) {
         memset(&s, 0, sizeof(s));
         if (sendto(disc_sock, buf, 1, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
-            error_printf("error sending disovery");
+            error_printf("error sending disovery\n");
         }
 
         if (poll(&pollinfo, 1, timeout) == 1) {
@@ -917,6 +920,7 @@ static in_addr_t get_server_ip(const char* servername) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE;
+    in_addr_t server_ip = 0;
 
     int s = getaddrinfo(servername, "9090", &hints, &result);
     if (s != 0) {
@@ -926,7 +930,7 @@ static in_addr_t get_server_ip(const char* servername) {
     for (rp = result; rp != NULL; rp = rp->ai_next) {
         switch(rp->ai_family) {
             case AF_INET:
-                return  ((struct sockaddr_in*)rp->ai_addr)->sin_addr.s_addr;
+                server_ip = ((struct sockaddr_in*)rp->ai_addr)->sin_addr.s_addr;
                 break;
             case AF_INET6:
             default:
@@ -935,13 +939,14 @@ static in_addr_t get_server_ip(const char* servername) {
         }
     }
     freeaddrinfo(result);
-    return 0;
+    return server_ip;
 }
 
-static int __open_player(player_ptr player) {
-    player->io.sockfd = -1;
-    player->cmd_io.sockfd = -1;
-
+int open_player(player_ptr player) {
+    if (player->server.sin_addr.sin_addr.s_addr != 0 && player->lms_player_id != NULL) {
+        return 0;
+    }
+    // FIXME : move this out - this forces all open_player calls to local players
     get_local_addrs(player);
 
     player->server.sin_addr.sin_family = AF_INET;
@@ -959,40 +964,6 @@ static int __open_player(player_ptr player) {
         return -5;
     }
 
-    if ((player->io.sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        error_printf("Socket creation error\n");
-        return -4;
-    }
-    
-    int status =  connect(player->io.sockfd, &player->server.sock_addr, sizeof(player->server.sock_addr));
-    if (status < 0) {
-        error_printf("Connection failed %d\n", status);
-        __close_player(player);
-        return -2;
-    }
-    player->io.fp = fdopen(player->io.sockfd, "r");
-    if (NULL == player->io.fp) {
-        __close_player(player);
-        return -3;
-    }
-
-    if ((player->cmd_io.sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        error_printf("Socket creation error\n");
-        return -104;
-    }
-    
-    status =  connect(player->cmd_io.sockfd, &player->server.sock_addr, sizeof(player->server.sock_addr));
-    if (status < 0) {
-        error_printf("Connection failed %d\n", status);
-        __close_player(player);
-        return -102;
-    }
-    player->cmd_io.fp = fdopen(player->cmd_io.sockfd, "r");
-    if (NULL == player->cmd_io.fp) {
-        __close_player(player);
-        return -103;
-    }
-    
     char *p = lms_query(player, "player count");
     int player_count = -1;
     player_count = atoi(p);
@@ -1031,24 +1002,12 @@ static int __open_player(player_ptr player) {
     return 0;
 }
 
-static void close_player(player_ptr player) {
+void close_player(player_ptr player) {
     if (player) {
         __close_player(player);
         FREE(player->lms);
         ZERO(player);
     }
-}
-
-static int reopen_player(player_ptr player) {
-    const char* lms = player->lms;
-    __close_player(player);
-    ZERO(player);
-    player->lms = lms;
-    int rv = __open_player(player);
-    if (rv) {
-        error_printf("reopen_player failed\n");
-    }
-    return rv;
 }
 
 // public interface
@@ -1064,30 +1023,34 @@ player_ptr open_local_player(const char *lms_addr) {
         if (lms_addr) {
             player->lms = strdup(lms_addr);
         }
-        int status = __open_player(player);
-        if (status) {
-            close_player(player);
-            free(player);
+        int status = open_player(player);
+        if (status == 0) {
+            clear_player_status(&player->status);
+        } else {
+//            close_player(player);
+//            free(player);
             error_printf("open player to %s failed %d\n", lms_addr, status);
-            return NULL;
+//            return NULL;
         }
-        clear_player_status(&player->status);
     }
     return player;
 }
 
 int poll_player(player_ptr player, player_transient_state_ptr ptransient) {
-    if (player) {
+    int rv = 0;
+    if (ptransient) {
+        ptransient->elapsed_secs = 0;
+        ptransient->volume = 0;
+    }
+    if (player->lms_player_id) {
         get_player_volume(player);
         if (ptransient) {
             ptransient->elapsed_secs = player->status.elapsed_time;
             ptransient->volume = player->volume;
         }
-        return get_player_status(player);
+        rv = get_player_status(player);
     }
-    ptransient->elapsed_secs = 0;
-    ptransient->volume = 0;
-    return 0;
+    return rv;
 }
 
 player_ptr close_local_player(player_ptr player) {
@@ -1101,6 +1064,8 @@ player_ptr close_local_player(player_ptr player) {
 
 static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const char *key) {
     pfv_type return_value = PFV_NONE;
+    pfv->integer = 0;
+    pfv->strptr = NULL;
 #define PFV_INTVALUE(nm, gt) \
     if (player->status.nm > gt) { \
         return_value = PFV_INT; \
@@ -1113,7 +1078,7 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
         pfv->strptr = player->status.nm; \
     }
     
-    if (player == NULL) {
+    if (player == NULL || player->lms_player_id == NULL) {
         return return_value;
     }
 

@@ -11,6 +11,8 @@ typedef struct {
     int volume;
 }player_transient_state,*player_transient_state_ptr;
 
+int open_player(player_ptr player);
+void close_player(player_ptr player);
 player_ptr open_local_player(const char *lms_addr);
 player_ptr close_local_player(player_ptr player);
 
