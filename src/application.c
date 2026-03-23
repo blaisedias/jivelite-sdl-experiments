@@ -31,6 +31,14 @@ static uint32_t low_fps_count;
 static int64_t acc_fps = 0;
 static unsigned fps_sample_counter = 0;
 
+static inline void free_ex(void** tgt) {
+    if (*tgt) {
+        free(*tgt);
+    }
+    *tgt = NULL;
+}
+#define FREE(x) free_ex((void **)(&x))
+
 bool app_initialize(app_context* app_ctx, const char* window_title) {
     app_ctx->workspace.player_mode = PLAYER_MODE_UNDEFINED;
 
@@ -226,7 +234,8 @@ bool app_initialize(app_context* app_ctx, const char* window_title) {
 }
 
 void app_cleanup(app_context* app_ctx, int exit_status) {
-//    TTF_CloseFont(app->text_font);
+    printf("app_cleanup\n");
+    close_local_player(app_ctx->player);
     SDL_DestroyRenderer(app_ctx->renderer);
     SDL_DestroyWindow(app_ctx->window);
     TTF_Quit();
@@ -426,6 +435,8 @@ void sdl_input_loop(view_context* view) {
 
     while (input_loop) {
         if (iters % 5 == 0) {
+            // ensure that the player is initialised - if possible, nop if the player is initialised
+            open_player(app_ctx->player);
             if (poll_player(app_ctx->player, &pts)) {
                 bool can_seek = true;
                 {
@@ -440,6 +451,7 @@ void sdl_input_loop(view_context* view) {
                                 break;
                             case PFV_STRINGPTR:
                                 error_printf("got string %s for player value CAN_SEEK\n", pvalue.strptr);
+                                FREE(pvalue.strptr);
                                 break;
                     }
                 }
@@ -459,6 +471,7 @@ void sdl_input_loop(view_context* view) {
                                 break;
                             case PFV_STRINGPTR:
                                 error_printf("got string %s for player range value %s\n", pvalue.strptr, t->player_range_value_key);
+                                FREE(pvalue.strptr);
                                 break;
                         }
                     }
@@ -478,6 +491,7 @@ void sdl_input_loop(view_context* view) {
                                 break;
                             case PFV_STRINGPTR:
                                 error_printf("got string %s for player value %s\n", pvalue.strptr, t->player_value_key);
+                                FREE(pvalue.strptr);
                                 break;
                         }
                     }
