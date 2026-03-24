@@ -54,4 +54,4 @@ fi
 export TCACHE_SIZE="texture_cache_size 50000000"
 
 #./bin/sqvumeter dl ./lib/TubeD.so  dl ./lib/Chevrons.so dl ./lib/PurpleTastic.so vsync vu PurpleTastic2Transparent $* $TCACHE_SIZE
-./bin/sqvumeter dl ./lib/TubeD.so  dl ./lib/Chevrons.so dl ./lib/PurpleTastic.so vu PurpleTastic2Transparent $* $TCACHE_SIZE
+./bin/sqvumeter dl ./lib/TubeD.so  dl ./lib/Chevrons.so dl ./lib/PurpleTastic.so dl ./lib/Speaker25.so vu PurpleTastic2Transparent $* $TCACHE_SIZE

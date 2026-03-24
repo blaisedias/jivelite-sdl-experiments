@@ -1,0 +1,352 @@
+// This file is generated, do not modify
+
+
+#include <stddef.h>
+#include <SDL2/SDL_image.h>
+#include <SDL2/SDL_render.h>
+#include "vumeterdef.h"
+
+
+// Resources enumeration
+enum resources_enum {
+    RSRC_NULL,
+    RSRC_LEFT_BG,
+    RSRC_RIGHT_BG,
+    RSRC_L00,
+    RSRC_L01,
+    RSRC_L02,
+    RSRC_L03,
+    RSRC_L04,
+    RSRC_L05,
+    RSRC_L06,
+    RSRC_L07,
+    RSRC_L08,
+    RSRC_L09,
+    RSRC_L10,
+    RSRC_L11,
+    RSRC_L12,
+    RSRC_L13,
+    RSRC_L14,
+    RSRC_L15,
+    RSRC_L16,
+    RSRC_L17,
+    RSRC_L18,
+    RSRC_L19,
+    RSRC_L20,
+    RSRC_L21,
+    RSRC_L22,
+    RSRC_L23,
+    RSRC_L24,
+    RSRC_R00,
+    RSRC_R01,
+    RSRC_R02,
+    RSRC_R03,
+    RSRC_R04,
+    RSRC_R05,
+    RSRC_R06,
+    RSRC_R07,
+    RSRC_R08,
+    RSRC_R09,
+    RSRC_R10,
+    RSRC_R11,
+    RSRC_R12,
+    RSRC_R13,
+    RSRC_R14,
+    RSRC_R15,
+    RSRC_R16,
+    RSRC_R17,
+    RSRC_R18,
+    RSRC_R19,
+    RSRC_R20,
+    RSRC_R21,
+    RSRC_R22,
+    RSRC_R23,
+    RSRC_R24,
+    RSRC_COUNT,
+};
+
+
+static const char* resource_names[] = {
+   NULL,
+   "background.png",
+   "background.png",
+   "Cspk00.png",
+   "Cspk01.png",
+   "Cspk02.png",
+   "Cspk03.png",
+   "Cspk04.png",
+   "Cspk05.png",
+   "Cspk06.png",
+   "Cspk07.png",
+   "Cspk08.png",
+   "Cspk09.png",
+   "Cspk10.png",
+   "Cspk11.png",
+   "Cspk12.png",
+   "Cspk13.png",
+   "Cspk14.png",
+   "Cspk15.png",
+   "Cspk16.png",
+   "Cspk17.png",
+   "Cspk18.png",
+   "Cspk19.png",
+   "Cspk20.png",
+   "Cspk21.png",
+   "Cspk22.png",
+   "Cspk23.png",
+   "Cspk24.png",
+   "Cspk00.png",
+   "Cspk01.png",
+   "Cspk02.png",
+   "Cspk03.png",
+   "Cspk04.png",
+   "Cspk05.png",
+   "Cspk06.png",
+   "Cspk07.png",
+   "Cspk08.png",
+   "Cspk09.png",
+   "Cspk10.png",
+   "Cspk11.png",
+   "Cspk12.png",
+   "Cspk13.png",
+   "Cspk14.png",
+   "Cspk15.png",
+   "Cspk16.png",
+   "Cspk17.png",
+   "Cspk18.png",
+   "Cspk19.png",
+   "Cspk20.png",
+   "Cspk21.png",
+   "Cspk22.png",
+   "Cspk23.png",
+   "Cspk24.png",
+};
+
+
+static texture_id_t textures[RSRC_COUNT];
+
+enum placements_enum {
+    PLCMNT_NULL,
+    PLCMNT_L00,
+    PLCMNT_L01,
+    PLCMNT_L02,
+    PLCMNT_L03,
+    PLCMNT_L04,
+    PLCMNT_L05,
+    PLCMNT_L06,
+    PLCMNT_L07,
+    PLCMNT_L08,
+    PLCMNT_L09,
+    PLCMNT_L10,
+    PLCMNT_L11,
+    PLCMNT_L12,
+    PLCMNT_L13,
+    PLCMNT_L14,
+    PLCMNT_L15,
+    PLCMNT_L16,
+    PLCMNT_L17,
+    PLCMNT_L18,
+    PLCMNT_L19,
+    PLCMNT_L20,
+    PLCMNT_L21,
+    PLCMNT_L22,
+    PLCMNT_L23,
+    PLCMNT_L24,
+    PLCMNT_LEFT_BG,
+    PLCMNT_R00,
+    PLCMNT_R01,
+    PLCMNT_R02,
+    PLCMNT_R03,
+    PLCMNT_R04,
+    PLCMNT_R05,
+    PLCMNT_R06,
+    PLCMNT_R07,
+    PLCMNT_R08,
+    PLCMNT_R09,
+    PLCMNT_R10,
+    PLCMNT_R11,
+    PLCMNT_R12,
+    PLCMNT_R13,
+    PLCMNT_R14,
+    PLCMNT_R15,
+    PLCMNT_R16,
+    PLCMNT_R17,
+    PLCMNT_R18,
+    PLCMNT_R19,
+    PLCMNT_R20,
+    PLCMNT_R21,
+    PLCMNT_R22,
+    PLCMNT_R23,
+    PLCMNT_R24,
+    PLCMNT_RIGHT_BG,
+    PLCMNT_COUNT,
+};
+
+
+static vumeter_element placements[] = {
+   { .texture_index=RSRC_NULL, .rect={ 0, 0, 0, 0}, },
+   { .texture_index=RSRC_L00, .rect={ 91, 59, 146, 146}, },
+   { .texture_index=RSRC_L01, .rect={ 90, 58, 148, 148}, },
+   { .texture_index=RSRC_L02, .rect={ 89, 57, 150, 150}, },
+   { .texture_index=RSRC_L03, .rect={ 88, 56, 152, 152}, },
+   { .texture_index=RSRC_L04, .rect={ 87, 55, 154, 154}, },
+   { .texture_index=RSRC_L05, .rect={ 86, 54, 156, 156}, },
+   { .texture_index=RSRC_L06, .rect={ 85, 53, 158, 158}, },
+   { .texture_index=RSRC_L07, .rect={ 84, 52, 160, 160}, },
+   { .texture_index=RSRC_L08, .rect={ 83, 51, 162, 162}, },
+   { .texture_index=RSRC_L09, .rect={ 82, 50, 164, 164}, },
+   { .texture_index=RSRC_L10, .rect={ 81, 49, 166, 166}, },
+   { .texture_index=RSRC_L11, .rect={ 80, 48, 168, 168}, },
+   { .texture_index=RSRC_L12, .rect={ 79, 47, 170, 170}, },
+   { .texture_index=RSRC_L13, .rect={ 78, 46, 172, 172}, },
+   { .texture_index=RSRC_L14, .rect={ 77, 45, 174, 174}, },
+   { .texture_index=RSRC_L15, .rect={ 76, 44, 176, 176}, },
+   { .texture_index=RSRC_L16, .rect={ 75, 43, 178, 178}, },
+   { .texture_index=RSRC_L17, .rect={ 74, 42, 180, 180}, },
+   { .texture_index=RSRC_L18, .rect={ 73, 41, 182, 182}, },
+   { .texture_index=RSRC_L19, .rect={ 72, 40, 184, 184}, },
+   { .texture_index=RSRC_L20, .rect={ 71, 39, 186, 186}, },
+   { .texture_index=RSRC_L21, .rect={ 70, 38, 188, 188}, },
+   { .texture_index=RSRC_L22, .rect={ 69, 37, 190, 190}, },
+   { .texture_index=RSRC_L23, .rect={ 68, 36, 192, 192}, },
+   { .texture_index=RSRC_L24, .rect={ 67, 35, 194, 194}, },
+   { .texture_index=RSRC_LEFT_BG, .rect={ 32, 0, 265, 265}, },
+   { .texture_index=RSRC_R00, .rect={ 388, 59, 146, 146}, },
+   { .texture_index=RSRC_R01, .rect={ 387, 58, 148, 148}, },
+   { .texture_index=RSRC_R02, .rect={ 386, 57, 150, 150}, },
+   { .texture_index=RSRC_R03, .rect={ 385, 56, 152, 152}, },
+   { .texture_index=RSRC_R04, .rect={ 384, 55, 154, 154}, },
+   { .texture_index=RSRC_R05, .rect={ 383, 54, 156, 156}, },
+   { .texture_index=RSRC_R06, .rect={ 382, 53, 158, 158}, },
+   { .texture_index=RSRC_R07, .rect={ 381, 52, 160, 160}, },
+   { .texture_index=RSRC_R08, .rect={ 380, 51, 162, 162}, },
+   { .texture_index=RSRC_R09, .rect={ 379, 50, 164, 164}, },
+   { .texture_index=RSRC_R10, .rect={ 378, 49, 166, 166}, },
+   { .texture_index=RSRC_R11, .rect={ 377, 48, 168, 168}, },
+   { .texture_index=RSRC_R12, .rect={ 376, 47, 170, 170}, },
+   { .texture_index=RSRC_R13, .rect={ 375, 46, 172, 172}, },
+   { .texture_index=RSRC_R14, .rect={ 374, 45, 174, 174}, },
+   { .texture_index=RSRC_R15, .rect={ 373, 44, 176, 176}, },
+   { .texture_index=RSRC_R16, .rect={ 372, 43, 178, 178}, },
+   { .texture_index=RSRC_R17, .rect={ 371, 42, 180, 180}, },
+   { .texture_index=RSRC_R18, .rect={ 370, 41, 182, 182}, },
+   { .texture_index=RSRC_R19, .rect={ 369, 40, 184, 184}, },
+   { .texture_index=RSRC_R20, .rect={ 368, 39, 186, 186}, },
+   { .texture_index=RSRC_R21, .rect={ 367, 38, 188, 188}, },
+   { .texture_index=RSRC_R22, .rect={ 366, 37, 190, 190}, },
+   { .texture_index=RSRC_R23, .rect={ 365, 36, 192, 192}, },
+   { .texture_index=RSRC_R24, .rect={ 364, 35, 194, 194}, },
+   { .texture_index=RSRC_RIGHT_BG, .rect={ 329, 0, 265, 265}, },
+};
+
+
+//Background
+// background placements
+static const int speaker25[] = {
+    PLCMNT_LEFT_BG,
+    PLCMNT_RIGHT_BG,
+    0
+};
+
+enum backgrounds_enum {
+    BG_SPEAKER25,
+    BG_COUNT,
+};
+
+static background backgrounds[] = {
+    {.bg=speaker25 },
+};
+
+
+//Levels
+static component levels_1_left[] = {
+    {
+        .render=SINGLE, .peak=DECAY,
+        .placements={
+            PLCMNT_L00,
+            PLCMNT_L01,
+            PLCMNT_L02,
+            PLCMNT_L03,
+            PLCMNT_L04,
+            PLCMNT_L05,
+            PLCMNT_L06,
+            PLCMNT_L07,
+            PLCMNT_L08,
+            PLCMNT_L09,
+            PLCMNT_L10,
+            PLCMNT_L11,
+            PLCMNT_L12,
+            PLCMNT_L13,
+            PLCMNT_L14,
+            PLCMNT_L15,
+            PLCMNT_L16,
+            PLCMNT_L17,
+            PLCMNT_L18,
+            PLCMNT_L19,
+            PLCMNT_L20,
+            PLCMNT_L21,
+            PLCMNT_L22,
+            PLCMNT_L23,
+            PLCMNT_L24,
+        },
+    },
+};
+
+static channel channel_levels_1_left = { 1, levels_1_left,};
+
+
+static component levels_1_right[] = {
+    {
+        .render=SINGLE, .peak=DECAY,
+        .placements={
+            PLCMNT_R00,
+            PLCMNT_R01,
+            PLCMNT_R02,
+            PLCMNT_R03,
+            PLCMNT_R04,
+            PLCMNT_R05,
+            PLCMNT_R06,
+            PLCMNT_R07,
+            PLCMNT_R08,
+            PLCMNT_R09,
+            PLCMNT_R10,
+            PLCMNT_R11,
+            PLCMNT_R12,
+            PLCMNT_R13,
+            PLCMNT_R14,
+            PLCMNT_R15,
+            PLCMNT_R16,
+            PLCMNT_R17,
+            PLCMNT_R18,
+            PLCMNT_R19,
+            PLCMNT_R20,
+            PLCMNT_R21,
+            PLCMNT_R22,
+            PLCMNT_R23,
+            PLCMNT_R24,
+        },
+    },
+};
+
+static channel channel_levels_1_right = { 1, levels_1_right,};
+
+
+static vumeter vumeters[] = {
+    {
+        .name="Speaker25",
+        .background=&backgrounds[BG_SPEAKER25],
+        .channels={ &channel_levels_1_left, &channel_levels_1_right, }
+    },
+};
+
+
+// VU Meter properties
+vumeter_properties VuProperties = {
+    .name="Speaker25",
+    .volume_levels=25, .w=626, .h=265,
+    .vumeter_count=1, .vumeters=vumeters,
+    .resources={.count=RSRC_COUNT, .names=resource_names, .textures=textures },
+    .placements={.count=PLCMNT_COUNT,.elements=placements },
+};
+
+
