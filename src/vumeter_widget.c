@@ -131,6 +131,10 @@ static void vumeter_render(widget* wdgt) {
     vumeter_widget* vw = wdgt->sub.vu;
     int vols[2];
     visualizer_vumeter(vols);
+    if(vw->meters[vumeter_index(vw)].props->volume_levels != 49) {
+        vols[0] = vols[0] * vw->meters[vumeter_index(vw)].props->volume_levels/50;
+        vols[1] = vols[1] * vw->meters[vumeter_index(vw)].props->volume_levels/50;
+    }
     VUMeter_draw(wdgt->view->app->renderer,vw->meters[vumeter_index(vw)].props,vw->meters[vumeter_index(vw)].meter, vols, &draw_rect);
 }
 
