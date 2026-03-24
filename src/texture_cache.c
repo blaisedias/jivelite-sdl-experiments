@@ -230,7 +230,7 @@ static void update_texture(tcache_entry* tce, const SDL_Texture* texture) {
             if (0 == SDL_QueryTexture((SDL_Texture*)texture, &fmt, NULL, &tce->w, &tce->h)) {
                 tce->num_bytes = SDL_BYTESPERPIXEL(fmt) * tce->w * tce->h;
                 num_texture_bytes += tce->num_bytes;
-                tcache_printf("update_texture: texture_bytes=%d\n", num_texture_bytes);
+                tcache_printf("update_texture: texture_bytes=%d %s\n", num_texture_bytes, tce->path);
             }
             tce->texture = texture;
         }
