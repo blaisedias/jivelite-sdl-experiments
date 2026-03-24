@@ -13,6 +13,8 @@
 #include <netdb.h>
 #include <poll.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/select.h>
 
 #include "timing.h"
 #include "logging.h"
@@ -493,13 +495,55 @@ static int __lms_req(player_ptr player, const char* prefix, const char* suffix, 
     return rv;
 }
 
+// returns 0 on success
+int connect_timeout(int sockfd, struct sockaddr* sockaddr, struct timeval* tv) {
+    // get socket flags
+    int flags = fcntl(sockfd, F_GETFL, 0);
+    // set socket to non-blocking
+    fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+
+    int connected = connect(sockfd, sockaddr, sizeof(*sockaddr));
+    if (connected != 0) {
+        if (errno == EINPROGRESS) {
+            fd_set wait_fds;
+            FD_ZERO(&wait_fds);
+            FD_SET(sockfd, &wait_fds);
+            connected = select(sockfd + 1, NULL, &wait_fds, NULL, tv);
+            if (connected > 0) {
+                int err = 0;
+                socklen_t err_len = sizeof(err);
+                getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &err, &err_len);
+                if (err != 0) {
+                    error_printf("connect failed %s\n", strerror(err));
+                    errno = err;
+                }
+                connected = err;
+            } else {
+                error_printf("connect timedout\n");
+            }
+        }
+    }
+
+    // restore socket flags
+    fcntl(sockfd, F_SETFL, flags);
+    return connected;
+}
+
 static int _lms_req(player_ptr player, const char* prefix, const char* suffix, const char *format, va_list args, char** data_ptr) {
     lms_io io;
     *data_ptr = NULL;
     int rv = -6;
 
     if ((io.sockfd = socket(AF_INET, SOCK_STREAM, 0)) > 0) {
-        int status =  connect(io.sockfd, &player->server.sock_addr, sizeof(player->server.sock_addr));
+        struct timeval  tv = { .tv_sec=1, .tv_usec = 0};
+        if (setsockopt(io.sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) ) {
+            error_printf("failed to set socket receive timeout on %d %s\n", io.sockfd, strerror(errno));
+        }
+        if (setsockopt(io.sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) ) {
+            error_printf("failed to set socket send timeout %d %s\n", io.sockfd, strerror(errno));
+        }
+//        int status =  connect(io.sockfd, &player->server.sock_addr, sizeof(player->server.sock_addr));
+        int status =  connect_timeout(io.sockfd, &player->server.sock_addr, &tv);
         if (status == 0) {
             // connection succeeded, clear failure timestamp
             player->connection_failed_ts = 0;
