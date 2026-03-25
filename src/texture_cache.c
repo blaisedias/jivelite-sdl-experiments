@@ -558,13 +558,12 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
         return true;
     }
     tcache_lock(&delete_lock);
-    bool tce_is_valid = !unoccupied_tce(tce);
-    if (tce_is_valid) {
+    if (!unoccupied_tce(tce)) {
         // prevent the entry from being deleted.
         tce->delete = false;
     }
     tcache_unlock(&delete_lock);
-    if (tce_is_valid) {
+    if (!unoccupied_tce(tce)) {
         // loading is only required if the associated texture or surface does not exist
         if (tce->texture == NULL && tce->surface == NULL) {
             tcache_printf("tcache_load_from_file: : %d %s\n", texture_id, tce->path);
@@ -574,8 +573,12 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
             } else {
                 tce->w = tce->surface->w;
                 tce->h = tce->surface->h;
+                tcache_eject_printf("tcache_load_from_file: loaded: %s\n", tce->path);
             }
+        } else {
+            tcache_eject_printf("tcache_load_from_file: loaded: %s\n", tce->path);
         }
+        __atomic_store_n(&tce->lru_count, lru_counter, __ATOMIC_RELEASE);
         return tce->texture != NULL || tce->surface !=NULL; 
     }
     error_printf("tcache_load_from_file: invalid: %d\n", texture_id);
@@ -598,6 +601,7 @@ bool tcache_set_surface(texture_id_t texture_id, SDL_Surface* surface) {
             return true;
         } else {
             SDL_Surface *obsolete = __atomic_exchange_n(&tce->surface, surface, __ATOMIC_ACQ_REL);
+            __atomic_store_n(&tce->lru_count, lru_counter, __ATOMIC_RELEASE);
             if (obsolete) {
                 SDL_FreeSurface(obsolete);
             }
