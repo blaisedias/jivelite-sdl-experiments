@@ -377,6 +377,9 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* ren
             tce->surface = NULL;
             profile_texture_printf("texture_resolve: create_texture: %06lu usec %u/%u\n", ms_ct_1 - ms_ct_0, num_texture_bytes, max_num_texture_bytes);
         }
+        if (tce != &empty_tce && tce->texture == NULL) {
+            error_printf("tcache_quick_get_texture: NULL texture: %d %s\n", texture_id, tce->path);
+        }
         // stored as a const - callers require a pointer which is not const
         return (SDL_Texture *)tce->texture;
     }
