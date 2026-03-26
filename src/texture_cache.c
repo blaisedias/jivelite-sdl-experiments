@@ -148,14 +148,8 @@ static int qs_tcache_partition(tcache_entry** tce_arr, int lo, int hi) {
     // temp pivot
     int i = lo-1;
     for (int j = lo; j < hi; j++) {
-        // set MSB if locked, since locked => newest always
-        // setting the MSB is sufficient for all practical purposes.
-        uint32_t effective_lru = tce_arr[j]->lru_count + tce_arr[j]->locked ? 1<<31: 0;
-        uint64_t pivot_effective_lru = pivot->lru_count + pivot->locked ? 1<<31: 0;
-
         // if the current element <= pivot 
-//        if (tce_arr[j]->lru_count <= pivot->lru_count) {
-        if (effective_lru < pivot_effective_lru) {
+        if (tce_arr[j]->lru_count <= pivot->lru_count) {
             // move temporary pivot index forward
             ++i;
             // swap current element with temporary pivot
@@ -476,7 +470,9 @@ static int lru_sort_tce(tcache_entry** lru_sorted_tbl) {
         // candidates for ejection must have a texture
         if (external_tce(tce) 
                 && 
-                __atomic_load_n(&tce->texture, __ATOMIC_ACQUIRE)) {
+                __atomic_load_n(&tce->texture, __ATOMIC_ACQUIRE)
+                &&
+                !tce->locked) {
            lru_sorted_tbl[indx] = tce;
            ++indx;
         }
