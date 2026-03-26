@@ -575,7 +575,7 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
                 tcache_eject_printf("tcache_load_from_file: loaded: %s\n", tce->path);
             }
         } else {
-            tcache_eject_printf("tcache_load_from_file: loaded: %s\n", tce->path);
+            tcache_eject_printf("tcache_load_from_file: %s\n", tce->path);
         }
         __atomic_store_n(&tce->lru_count, lru_counter, __ATOMIC_RELEASE);
         return tce->texture != NULL || tce->surface !=NULL; 
