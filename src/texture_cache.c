@@ -63,6 +63,7 @@ static uint32_t lru_counter = 1;
 unsigned num_texture_bytes = 0;
 unsigned max_num_texture_bytes = 0;
 unsigned char delete_requested = 0;
+unsigned num_surface_bytes = 0;
 
 #define PRIME2K 2039
 #define PRIME4k 4093
@@ -378,6 +379,7 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* ren
             }
             update_texture(tce, texture);
             SDL_FreeSurface(tce->surface);
+            __atomic_sub_fetch(&num_surface_bytes, 4 * tce->w * tce->h, __ATOMIC_ACQ_REL);
             tce->surface = NULL;
             profile_texture_printf("texture_resolve: create_texture: %06lu usec %u/%u\n", ms_ct_1 - ms_ct_0, num_texture_bytes, max_num_texture_bytes);
         }
@@ -513,7 +515,7 @@ static bool tcache_eject(unsigned increment, bool (*check)(int, int)) {
             release_texture(tce);
             tce->ejected = true;
             ++ejected_count;
-            tcache_eject_printf("tcache_eject: %s %d %u / %u\n", tce->path, increment, num_texture_bytes, max_num_texture_bytes);
+            tcache_eject_printf("tcache_eject: %s %u / %u lru:%u, req:%u lru_counter:%u\n", tce->path, num_texture_bytes, max_num_texture_bytes, tce->lru_count, increment, lru_counter);
         }
     }
     assert(lru_eject.ix < lru_eject.count);
@@ -573,6 +575,7 @@ bool tcache_load_from_file(texture_id_t texture_id, SDL_Renderer* renderer) {
             } else {
                 tce->w = tce->surface->w;
                 tce->h = tce->surface->h;
+                __atomic_add_fetch(&num_surface_bytes, 4 * tce->w * tce->h, __ATOMIC_ACQ_REL);
                 tcache_eject_printf("tcache_load_from_file: loaded: %s\n", tce->path);
             }
         } else {
@@ -704,6 +707,10 @@ void tcache_dump() {
 
 unsigned tcache_get_texture_bytes_count(void) {
     return num_texture_bytes;
+}
+
+unsigned tcache_get_surface_bytes_count(void) {
+    return num_surface_bytes;
 }
 
 texture_id_t tcache_get_empty_tid(void) {

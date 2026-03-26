@@ -37,6 +37,7 @@ texture_id_t tcache_get_texture_id(const char* token);
 bool tcache_quick_get_texture_dimensions(texture_id_t texture_id, int* w, int* h);
 
 unsigned tcache_get_texture_bytes_count(void);
+unsigned tcache_get_surface_bytes_count(void);
 void tcache_set_limit(unsigned);
 
 // These functions can be called by any thread, but actions

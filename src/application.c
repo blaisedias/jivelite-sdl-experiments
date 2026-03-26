@@ -594,8 +594,9 @@ void sdl_input_loop(view_context* view) {
                     break;
                 case SDL_SCANCODE_SPACE:
                     {
-                        int m = tcache_get_texture_bytes_count();
-                        printf("\n %d %fMiB\n", m, (float)m/(1024*1024));
+                        unsigned texture_bytes = tcache_get_texture_bytes_count();
+                        unsigned surface_bytes = tcache_get_surface_bytes_count();
+                        printf("\n texture:%u %fMiB surface:%u %fMib\n", texture_bytes, (float)texture_bytes/(1024*1024), surface_bytes, (float)surface_bytes/(1024*1024));
                     }
                     break;
                 case SDL_SCANCODE_T:
