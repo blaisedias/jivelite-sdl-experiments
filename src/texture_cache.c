@@ -78,6 +78,7 @@ unsigned num_surface_bytes = 0;
 #define HASHTPRIME PRIME4k
 #define COLLISION_STEP PRIME32k
 #define NUM_TBL_ENTRIES HASHTPRIME+1
+#define EMPTY_TEXTURE_ID HASHTPRIME
 static tcache_entry* tbl[NUM_TBL_ENTRIES];
 
 static SDL_threadID renderer_tid;
@@ -357,6 +358,9 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* ren
         error_printf("tcache_quick_get_texture: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
     }
+    if (texture_id == EMPTY_TEXTURE_ID) {
+        return NULL;
+    }
     tcache_entry* tce = tbl[texture_id];
     if (!unoccupied_tce(tce)) {
 //        tcache_printf("tcache_quick_get_texture: %d %u %s\n", texture_id, tce->hashv, tce->path);
@@ -377,7 +381,7 @@ SDL_Texture* tcache_quick_get_texture(texture_id_t texture_id, SDL_Renderer* ren
             tce->surface = NULL;
             profile_texture_printf("texture_resolve: create_texture: %06lu usec %u/%u\n", ms_ct_1 - ms_ct_0, num_texture_bytes, max_num_texture_bytes);
         }
-        if (tce != &empty_tce && tce->texture == NULL) {
+        if (tce->texture == NULL) {
             error_printf("tcache_quick_get_texture: NULL texture: %d %s\n", texture_id, tce->path);
         }
         // stored as a const - callers require a pointer which is not const
@@ -595,6 +599,10 @@ bool tcache_set_surface(texture_id_t texture_id, SDL_Surface* surface) {
     if (texture_id < 0 || texture_id >= NUM_TBL_ENTRIES) {
         error_printf("tcache_set_surface: invalid id %d\n", texture_id);
         exit(EXIT_FAILURE);
+    }
+    if (texture_id == EMPTY_TEXTURE_ID ) {
+        error_printf("tcache_set_surface: blocked set surface on empty_tce %d\n", texture_id);
+        return false;
     }
     tcache_entry* tce = tbl[texture_id];
     if (external_tce(tce)) {
