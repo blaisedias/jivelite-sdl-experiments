@@ -6,6 +6,7 @@
 #include <SDL2/SDL_render.h>
 #include "vumeterdef.h"
 
+
 // Resources enumeration
 enum resources_enum {
     RSRC_NULL,
