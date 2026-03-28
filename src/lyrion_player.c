@@ -322,6 +322,7 @@ struct lyrion_player {
     local_addr_ptr lp;
     const char* lms_player_id;
     player_status status;
+    bool status_lock;
     int volume;
     int64_t connection_failed_ts;
 };
@@ -348,6 +349,16 @@ uint64_t compute_player_hash(const char* s) {
         ++c;
     }
     return hash_value;
+}
+
+static void lock_player_status(player_ptr player) {
+    while(__atomic_test_and_set(&player->status_lock, __ATOMIC_ACQ_REL)) {
+        sleep_milli_seconds(10);
+    }
+}
+
+static void unlock_player_status(player_ptr player) {
+    __atomic_clear(&player->status_lock, __ATOMIC_RELEASE);
 }
 
 static void get_local_addrs(player_ptr player) {
@@ -535,7 +546,7 @@ static int _lms_req(player_ptr player, const char* prefix, const char* suffix, c
     int rv = -6;
 
     if ((io.sockfd = socket(AF_INET, SOCK_STREAM, 0)) > 0) {
-        struct timeval  tv = { .tv_sec=1, .tv_usec = 0};
+        struct timeval  tv = { .tv_sec=3, .tv_usec = 0};
         if (setsockopt(io.sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) ) {
             error_printf("failed to set socket receive timeout on %d %s\n", io.sockfd, strerror(errno));
         }
@@ -659,7 +670,7 @@ static void get_player_volume(player_ptr player) {
     FREE(p);
 }
 
-static bool get_player_status(player_ptr player) {
+static bool update_player_status(player_ptr player) {
 #define  SET_INTVALUE(nm) {\
     if (value) { \
         int _intval_ = atoi(value); \
@@ -883,6 +894,7 @@ static bool get_player_status(player_ptr player) {
         status_changed = status_changed || player->status.field_set[ix] != status.field_set[ix];
     }
     if (status_changed) {
+        lock_player_status(player);
         clear_player_status(&player->status);
         memcpy(&player->status, &status, sizeof(player_status));
         const char* artiste = player->status.artist ? player->status.artist : player->status.trackartist;
@@ -897,6 +909,7 @@ static bool get_player_status(player_ptr player) {
                 SET_READONLY_CHAR_PTR(player->status.meta_artist, strdup(player->status.albumartist));
             }
         }
+        unlock_player_status(player);
     } else {
         clear_player_status(&status);
     }
@@ -1092,7 +1105,7 @@ int poll_player(player_ptr player, player_transient_state_ptr ptransient) {
             ptransient->elapsed_secs = player->status.elapsed_time;
             ptransient->volume = player->volume;
         }
-        rv = get_player_status(player);
+        rv = update_player_status(player);
     }
     return rv;
 }
@@ -1475,7 +1488,9 @@ static pfv_type _get_player_value(player_ptr player, player_value_ptr pfv, const
 }
 
 pfv_type get_player_value(player_ptr player, player_value_ptr pfv, const char *key) {
+    lock_player_status(player);
     pfv_type pft = _get_player_value(player, pfv, key);
+    unlock_player_status(player);
     switch(pft) {
         case PFV_NONE:
         case PFV_INT:
@@ -1508,8 +1523,6 @@ static int snprintf_time(char *buff, size_t bufflen, int seconds, bool suppress0
 void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *format) {
     char* pre;
     char* post;
-    char* fmt = strdup(format);
-    char* scan = fmt;
     char* pprint = buff;
     int   wr;
     int   avail = bufflen;
@@ -1518,6 +1531,11 @@ void player_sprintf(player_ptr player, char* buff, size_t bufflen, const char *f
     if (player == NULL) {
         return;
     }
+
+    lock_player_status(player);
+
+    char* fmt = strdup(format);
+    char* scan = fmt;
 
 #define SNPRINTF(str) \
     wr = snprintf(pprint, avail, "%s", (str)); \
@@ -1665,6 +1683,7 @@ END:
     if (fmt) {
         free(fmt);
     }
+    unlock_player_status(player);
 }
 
 void player_volume_set(player_ptr player, int level) {

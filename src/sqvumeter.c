@@ -69,14 +69,15 @@ struct App {
 
 extern void sdl_render_loop(view_context* view);
 extern void sdl_input_loop(view_context* view);
+extern void player_poll_loop(view_context* view);
 
 int main(int argc, char **argv) {
     struct App app = {
         .context = {
             .renderer = NULL,
             .window = NULL,
-            .max_secs = (Uint32)-1,
-            .cycle_secs = (Uint32)-1,
+            .max_secs = 0,
+            .cycle_secs = 0,
             .vsync = 0,
             .window_title = WINDOW_TITLE,
             .json_file = json_file,
@@ -223,9 +224,13 @@ int main(int argc, char **argv) {
         app.context.screen_width = 800;
         app.context.screen_height = 480;
     }
+
+    // TODO: move the following sections of code to application.c
     SDL_Thread* render_thread = SDL_CreateThread((SDL_ThreadFunction)sdl_render_loop, "render", &view);
     SDL_Thread* input_thread = SDL_CreateThread((SDL_ThreadFunction)sdl_input_loop, "input", &view);
+    SDL_Thread* player_thread = SDL_CreateThread((SDL_ThreadFunction)player_poll_loop, "player", &view);
     SDL_WaitThread(input_thread, NULL);
+    SDL_WaitThread(player_thread, NULL);
     SDL_WaitThread(render_thread, NULL);
     app_cleanup(&app.context, EXIT_SUCCESS);
 

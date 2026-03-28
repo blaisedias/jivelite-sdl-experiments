@@ -272,12 +272,12 @@ void sdl_render_loop(view_context* view) {
         } else {
             printf("Failed to retrieve renderer information\n");
         }
-        printf("display:%dx%d Orientation:%f,  max seconds:%u performance freq:%lu\n",
+        printf("display:%dx%d Orientation:%f,  max seconds:%u cycle secs %u\n",
            app_ctx->screen_width,
            app_ctx->screen_height,
            app_ctx->orientation,
            app_ctx->max_secs,
-           SDL_GetPerformanceFrequency());
+           app_ctx->cycle_secs);
     }
 
 
@@ -327,7 +327,7 @@ void sdl_render_loop(view_context* view) {
     SDL_ShowCursor(SDL_DISABLE);
 
 
-    // try to set ms_00 to immediately after return from
+    // try to set ms_00 to immediately after return from:
     // SDL_RenderPresent with vsync set.
     SDL_RenderSetVSync(app_ctx->renderer, 1);
     SDL_RenderClear(app_ctx->renderer);
@@ -340,7 +340,39 @@ void sdl_render_loop(view_context* view) {
 
     while (__atomic_load_n(&render_loop, __ATOMIC_ACQUIRE)) {
         int64_t ms_0 = get_micro_seconds();
-        SDL_PumpEvents();
+        // On linux desktop crashes in SDL_PumpEvents when switched to 
+        // Assertion 'close_nointr(fd) != -EBADF' failed at src/basic/fd-util.c:69, function safe_close(). Aborting.
+        //
+        // Thread 2 "render" received signal SIGABRT, Aborted.
+        // [Switching to Thread 0x7fffeadff6c0 (LWP 352658)]
+        // 0x00007ffff76a7a2c in ?? () from /usr/lib/libc.so.6
+        // (gdb) bt
+        // #0  0x00007ffff76a7a2c in ?? () from /usr/lib/libc.so.6
+        // #1  0x00007ffff764d1a0 in raise () from /usr/lib/libc.so.6
+        // #2  0x00007ffff76345fe in abort () from /usr/lib/libc.so.6
+        // #3  0x00007fffec552457 in ?? () from /usr/lib/libudev.so.1
+        // #4  0x00007fffec5525ae in ?? () from /usr/lib/libudev.so.1
+        // #5  0x00007fffec5476d5 in ?? () from /usr/lib/libudev.so.1
+        // #6  0x00007fffec547d59 in ?? () from /usr/lib/libudev.so.1
+        // #7  0x00007fffec5486d3 in ?? () from /usr/lib/libudev.so.1
+        // #8  0x00007fffec53accc in ?? () from /usr/lib/libudev.so.1
+        // #9  0x00007fffec53b01f in ?? () from /usr/lib/libudev.so.1
+        // #10 0x00007fffec540217 in udev_enumerate_scan_devices () from /usr/lib/libudev.so.1
+        // #11 0x00007fffeae68e3c in ?? () from /usr/lib/libSDL3.so.0
+        // #12 0x00007fffeae726f8 in ?? () from /usr/lib/libSDL3.so.0
+        // #13 0x00007fffeb006ab9 in ?? () from /usr/lib/libSDL3.so.0
+        // #14 0x00007fffeb00703b in ?? () from /usr/lib/libSDL3.so.0
+        // #15 0x00007fffeae834d5 in ?? () from /usr/lib/libSDL3.so.0
+        // #16 0x00007fffeae535bb in ?? () from /usr/lib/libSDL3.so.0
+        // #17 0x0000555555559f95 in sdl_render_loop (view=<optimized out>) at src/application.c:343
+        // #18 0x00007fffeb0041d3 in ?? () from /usr/lib/libSDL3.so.0
+        // #19 0x00007ffff781610f in ?? () from /usr/lib/liblsan.so.0
+        // #20 0x00007ffff76a597a in ?? () from /usr/lib/libc.so.6
+        // #21 0x00007ffff77292bc in ?? () from /usr/lib/libc.so.6
+        //
+//        if (SDL_GetWindowFlags(app_ctx->window) & (SDL_WINDOW_INPUT_FOCUS|SDL_WINDOW_MOUSE_FOCUS|SDL_WINDOW_MOUSE_GRABBED)) {
+            SDL_PumpEvents();
+//        }
         int64_t ms_pe = get_micro_seconds();
         tcache_render_prep(app_ctx->renderer);
 //        tcache_flush_textures(app_ctx->renderer);
@@ -420,8 +452,6 @@ void sdl_render_loop(view_context* view) {
 
 void sdl_input_loop(view_context* view) {
     const app_context* app_ctx = view->app;
-    // workspace is non const
-    app_workspace_t* app_wksp = (app_workspace_t*)(&view->app->workspace);
     while(__atomic_load_n(&app_ctx->ready, __ATOMIC_ACQUIRE) == 0) {
         sleep_milli_seconds(100);
     }
@@ -429,133 +459,8 @@ void sdl_input_loop(view_context* view) {
     SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
     bool ignore_SDL_FINGER = 0 == start_touch_screen_event_generator(NULL);
     uint32_t iters=0;
-    player_transient_state pts;
-    char buffer[512];
-    uint64_t sig=0;
 
     while (input_loop) {
-        if (iters % 5 == 0) {
-            // ensure that the player is initialised - if possible, nop if the player is initialised
-            open_player(app_ctx->player);
-            if (poll_player(app_ctx->player, &pts)) {
-                bool can_seek = true;
-                {
-                    player_value pvalue;
-                    switch(get_player_value(app_ctx->player, &pvalue, "CAN_SEEK")) {
-                            case PFV_NONE:
-                                error_printf("got nothing for player value CAN_SEEK\n");
-                                break;
-                            case PFV_INT:
-                                debug_printf("got int %d for player CAN_SEEK\n", pvalue.integer);
-                                can_seek = pvalue.integer;
-                                break;
-                            case PFV_STRINGPTR:
-                                error_printf("got string %s for player value CAN_SEEK\n", pvalue.strptr);
-                                FREE(pvalue.strptr);
-                                break;
-                    }
-                }
-
-                for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
-                    if (t->player_range_value_key) {
-                        player_value pvalue;
-                        switch(get_player_value(app_ctx->player, &pvalue, t->player_range_value_key)) {
-                            case PFV_NONE:
-                                error_printf("got nothing for player range value %s\n", t->player_range_value_key);
-                                break;
-                            case PFV_INT:
-                                debug_printf("got int %d for player range value %s\n", pvalue.integer, t->player_range_value_key);
-                                if (t->type == WIDGET_SLIDER) {
-                                    widget_slider_range(t, 0, pvalue.integer);
-                                }
-                                break;
-                            case PFV_STRINGPTR:
-                                error_printf("got string %s for player range value %s\n", pvalue.strptr, t->player_range_value_key);
-                                FREE(pvalue.strptr);
-                                break;
-                        }
-                    }
-                    if (t->player_value_key) {
-                        player_value pvalue;
-                        switch(get_player_value(app_ctx->player, &pvalue, t->player_value_key)) {
-                            case PFV_NONE:
-                                error_printf("got nothing for player value %s\n", t->player_value_key);
-                                break;
-                            case PFV_INT:
-                                debug_printf("got int %d for player value %s\n", pvalue.integer, t->player_value_key);
-                                if (t->type == WIDGET_MULTISTATE_BUTTON) {
-                                    widget_multistate_button_set_state(t, pvalue.integer);
-                                } else if (t->type == WIDGET_SLIDER) {
-                                    widget_slider_set_value(t, pvalue.integer);
-                                }
-                                break;
-                            case PFV_STRINGPTR:
-                                error_printf("got string %s for player value %s\n", pvalue.strptr, t->player_value_key);
-                                FREE(pvalue.strptr);
-                                break;
-                        }
-                    }
-                    if (t->type == WIDGET_SLIDER && 0 == strcmp(t->player_value_key, "time")) {
-                        widget_slider_set_interactive(t, can_seek);
-                    }
-                    if (t->type == WIDGET_TEXT && t->sub.text.format) {
-                        player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
-                        debug_printf("'%s' -> '%s'\n", t->sub.text.format, buffer);
-                        widget_text_set_content(t, buffer);
-                    }
-                }
-                player_sprintf(app_ctx->player, buffer, sizeof(buffer), "{playlist_cur_index}{TITLE}{ARTIST}{ALBUM_OR_REMOTE_TITLE}");
-                uint64_t new_sig = compute_player_hash(buffer);
-                if (sig && new_sig != sig) {
-                    // TODO only change visualiser if user setting
-                    SDL_Event next_visu_event = {.type = USEREVENT_NEXT_VISU };
-                    SDL_PushEvent(&next_visu_event);
-                }
-                sig = new_sig;
-                player_value pv;
-                if (PFV_INT == get_player_value(app_ctx->player, &pv, "MODE")) {
-                    if (app_wksp->player_mode != pv.integer) {
-                        app_wksp->player_mode = pv.integer;
-                        app_wksp->player_mode_start_timestamp = get_milli_seconds();
-                    }
-                }
-            }
-            player_value pvalue;
-            get_player_value(app_ctx->player, &pvalue, "VOLUME");
-            int volume = pvalue.integer;
-            get_player_value(app_ctx->player, &pvalue, "DURATION");
-            int duration = pvalue.integer;
-            get_player_value(app_ctx->player, &pvalue, "time");
-            int elapsed = pvalue.integer;
-            for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
-                if (t->player_value_key) {
-                    if (0 == strcmp("VOLUME", t->player_value_key)) {
-                        if (t->type == WIDGET_SLIDER) {
-                            widget_slider_set_value(t, volume);
-                        }
-                    }
-                    if (duration && 0 == strcmp("time", t->player_value_key)) {
-                        if (t->type == WIDGET_SLIDER) {
-                            widget_slider_set_value(t, elapsed);
-                        }
-                    }
-                    if (t->type == WIDGET_TEXT) {
-                        if(0 == strcmp("time", t->player_value_key)) {
-                            player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
-                            widget_text_set_content(t, buffer);
-                        }
-                    }
-                }
-                if (t->runtime_value_key) {
-                    if (t->type == WIDGET_TEXT) {
-                        if(0 == strcmp("fps", t->runtime_value_key)) {
-                            snprintf(buffer, sizeof(buffer), "FPS:%u", app_wksp->reported_fps);
-                            widget_text_set_content(t, buffer);
-                        }
-                    }
-                }
-            }
-        }
         ++iters;
         int64_t t0 = get_micro_seconds();
         SDL_Event event;
@@ -679,7 +584,7 @@ void sdl_input_loop(view_context* view) {
                 break;
             }
         }
-        if (iters >= app_ctx->max_secs*10) {
+        if (app_ctx->max_secs && iters >= app_ctx->max_secs*10) {
             printf("terminating: iterations=%d max_secs=%d\n",
                    iters, app_ctx->max_secs);
             __atomic_clear(&render_loop, __ATOMIC_RELEASE);
@@ -697,7 +602,7 @@ void sdl_input_loop(view_context* view) {
             }
         }
         // close to 100 milliseconds
-        if (iters % (app_ctx->cycle_secs*10) == 0) {
+        if (app_ctx->cycle_secs && iters % (app_ctx->cycle_secs*10) == 0) {
             for(widget* t = view->list->head.next; t != NULL; t = t->next) {
                 if (t->type == WIDGET_VUMETER) {
                     widget_vumeter_select_next(t);
@@ -709,3 +614,140 @@ void sdl_input_loop(view_context* view) {
     stop_touch_screen_event_generator();
     debug_printf("*** input loop end ****\n");
 }
+
+void player_poll_loop(view_context* view) {
+    player_transient_state pts;
+    const app_context* app_ctx = view->app;
+    // workspace is non const
+    app_workspace_t* app_wksp = (app_workspace_t*)(&view->app->workspace);
+    char buffer[512];
+    uint64_t sig=0;
+
+    while(__atomic_load_n(&app_ctx->ready, __ATOMIC_ACQUIRE) == 0) {
+        sleep_milli_seconds(100);
+    }
+
+    while(input_loop) {
+        // ensure that the player is initialised - if possible, nop if the player is initialised
+        open_player(app_ctx->player);
+        if (poll_player(app_ctx->player, &pts)) {
+            bool can_seek = true;
+            {
+                player_value pvalue;
+                switch(get_player_value(app_ctx->player, &pvalue, "CAN_SEEK")) {
+                        case PFV_NONE:
+                            error_printf("got nothing for player value CAN_SEEK\n");
+                            break;
+                        case PFV_INT:
+                            debug_printf("got int %d for player CAN_SEEK\n", pvalue.integer);
+                            can_seek = pvalue.integer;
+                            break;
+                        case PFV_STRINGPTR:
+                            error_printf("got string %s for player value CAN_SEEK\n", pvalue.strptr);
+                            FREE(pvalue.strptr);
+                            break;
+                }
+            }
+
+            for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
+                if (t->player_range_value_key) {
+                    player_value pvalue;
+                    switch(get_player_value(app_ctx->player, &pvalue, t->player_range_value_key)) {
+                        case PFV_NONE:
+                            error_printf("got nothing for player range value %s\n", t->player_range_value_key);
+                            break;
+                        case PFV_INT:
+                            debug_printf("got int %d for player range value %s\n", pvalue.integer, t->player_range_value_key);
+                            if (t->type == WIDGET_SLIDER) {
+                                widget_slider_range(t, 0, pvalue.integer);
+                            }
+                            break;
+                        case PFV_STRINGPTR:
+                            error_printf("got string %s for player range value %s\n", pvalue.strptr, t->player_range_value_key);
+                            FREE(pvalue.strptr);
+                            break;
+                    }
+                }
+                if (t->player_value_key) {
+                    player_value pvalue;
+                    switch(get_player_value(app_ctx->player, &pvalue, t->player_value_key)) {
+                        case PFV_NONE:
+                            error_printf("got nothing for player value %s\n", t->player_value_key);
+                            break;
+                        case PFV_INT:
+                            debug_printf("got int %d for player value %s\n", pvalue.integer, t->player_value_key);
+                            if (t->type == WIDGET_MULTISTATE_BUTTON) {
+                                widget_multistate_button_set_state(t, pvalue.integer);
+                            } else if (t->type == WIDGET_SLIDER) {
+                                widget_slider_set_value(t, pvalue.integer);
+                            }
+                            break;
+                        case PFV_STRINGPTR:
+                            error_printf("got string %s for player value %s\n", pvalue.strptr, t->player_value_key);
+                            FREE(pvalue.strptr);
+                            break;
+                    }
+                }
+                if (t->type == WIDGET_SLIDER && 0 == strcmp(t->player_value_key, "time")) {
+                    widget_slider_set_interactive(t, can_seek);
+                }
+                if (t->type == WIDGET_TEXT && t->sub.text.format) {
+                    player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
+                    debug_printf("'%s' -> '%s'\n", t->sub.text.format, buffer);
+                    widget_text_set_content(t, buffer);
+                }
+            }
+            player_sprintf(app_ctx->player, buffer, sizeof(buffer), "{playlist_cur_index}{TITLE}{ARTIST}{ALBUM_OR_REMOTE_TITLE}");
+            uint64_t new_sig = compute_player_hash(buffer);
+            if (sig && new_sig != sig) {
+                // TODO only change visualiser if user setting is set
+                SDL_Event next_visu_event = {.type = USEREVENT_NEXT_VISU };
+                SDL_PushEvent(&next_visu_event);
+            }
+            sig = new_sig;
+            player_value pv;
+            if (PFV_INT == get_player_value(app_ctx->player, &pv, "MODE")) {
+                if (app_wksp->player_mode != pv.integer) {
+                    app_wksp->player_mode = pv.integer;
+                    app_wksp->player_mode_start_timestamp = get_milli_seconds();
+                }
+            }
+        }
+        player_value pvalue;
+        get_player_value(app_ctx->player, &pvalue, "VOLUME");
+        int volume = pvalue.integer;
+        get_player_value(app_ctx->player, &pvalue, "DURATION");
+        int duration = pvalue.integer;
+        get_player_value(app_ctx->player, &pvalue, "time");
+        int elapsed = pvalue.integer;
+        for(widget* t = view->list->tail.prev; t != NULL; t = t->prev) {
+            if (t->player_value_key) {
+                if (0 == strcmp("VOLUME", t->player_value_key)) {
+                    if (t->type == WIDGET_SLIDER) {
+                        widget_slider_set_value(t, volume);
+                    }
+                }
+                if (duration && 0 == strcmp("time", t->player_value_key)) {
+                    if (t->type == WIDGET_SLIDER) {
+                        widget_slider_set_value(t, elapsed);
+                    }
+                }
+                if (t->type == WIDGET_TEXT) {
+                    if(0 == strcmp("time", t->player_value_key)) {
+                        player_sprintf(app_ctx->player, buffer, sizeof(buffer), t->sub.text.format);
+                        widget_text_set_content(t, buffer);
+                    }
+                }
+            }
+            if (t->runtime_value_key) {
+                if (t->type == WIDGET_TEXT) {
+                    if(0 == strcmp("fps", t->runtime_value_key)) {
+                        snprintf(buffer, sizeof(buffer), "FPS:%u", app_wksp->reported_fps);
+                        widget_text_set_content(t, buffer);
+                    }
+                }
+            }
+        }
+    }
+}
+
