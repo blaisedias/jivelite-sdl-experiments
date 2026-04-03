@@ -229,6 +229,7 @@ static void update_texture(tcache_entry* tce, const SDL_Texture* texture) {
                 tcache_printf("update_texture: texture_bytes=%d %s\n", num_texture_bytes, tce->path);
             }
             tce->texture = texture;
+            SDL_SetTextureScaleMode((SDL_Texture*)texture, SDL_ScaleModeBest);
         }
         // TODO: do this before creating the texture
         tcache_cap_num_bytes(0);
