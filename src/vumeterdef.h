@@ -13,6 +13,11 @@ typedef struct {
 //    const char* image;
     int         texture_index;
     SDL_Rect    rect;
+    int         flip;
+    struct {
+        float       angle;
+        SDL_Point   centre;
+    }rotate;
 } vumeter_element;
 
 typedef enum {
